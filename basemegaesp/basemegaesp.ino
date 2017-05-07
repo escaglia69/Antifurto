@@ -36,7 +36,8 @@ sensorDataRecord tempData;
 int sid;
 int sidOnDisplay = SENSOR_NUM - 1;
 
-LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+//LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
 
 const int highButtonPin = A3;
 const int lowButtonPin = A2;
@@ -78,6 +79,7 @@ char startedAt [20] = "";
 #define ESP8266_BAUD 115200
 
 ESP8266 wifi(&EspSerial);
+BlynkTimer timer;
 
 void setup(void){
   Serial.begin(115200);
@@ -143,8 +145,9 @@ void setup(void){
   // Set ESP8266 baud rate
   EspSerial.begin(ESP8266_BAUD);
   delay(10);
-  wifi.enableMUX();
+  //wifi.enableMUX();
   Blynk.begin(auth, wifi, ssid, pass);
+  //Blynk.config(wifi, ssid);
   /*if (wifi.setOprToStation()) {
       Serial.print("to station ok\r\n");
   } else {
@@ -158,18 +161,19 @@ void setup(void){
   } else {
       Serial.print("Join AP failure\r\n");
   }
-  //Blynk.connectWiFi(ssid, pass);
-  delay(5000);*/
+  //Blynk.connectWiFi(ssid, pass);*/
+  delay(4000);
   CheckConnection();
   if (Blynk.connected()) {
      Serial.println(F("Rete in setup")); 
   }
+  timer.setInterval(60000L, CheckConnection);
   //Blynk.config(wifi, auth);
-  if (wifi.enableMUX()) {
+  /*if (wifi.enableMUX()) {
       Serial.print("multiple ok\r\n");
   } else {
       Serial.print("multiple err\r\n");
-  }
+  }*/
   
   if (wifi.startTCPServer(8080)) {
       Serial.print("start tcp server ok\r\n");
@@ -177,7 +181,7 @@ void setup(void){
       Serial.print("start tcp server err\r\n");
   }
   
-  if (wifi.setTCPServerTimeout(10)) { 
+  if (wifi.setTCPServerTimeout(5)) { 
       Serial.print("set tcp server timout 10 seconds\r\n");
   } else {
       Serial.print("set tcp server timout err\r\n");
@@ -188,8 +192,9 @@ void setup(void){
 void CheckConnection(){
   Connected2Blynk = Blynk.connected();
   if(!Connected2Blynk){
-    Serial.println(F("Not connected")); 
-    Blynk.connect();  // timeout set to 10 seconds and then continue without Blynk  
+    Serial.println(F("Not connected"));
+    //Blynk.connect(3000);  // timeout set to 10 seconds and then continue without Blynk
+    Blynk.reconnect();
   }
 }
 
@@ -231,7 +236,7 @@ void loop() {
       printToSerial(lcdl,sensorData[sid].dateTime);
       printOnLCD(lcdl);
       printOnWLCD(lcdl);
-      CheckConnection();
+      //CheckConnection();
     } else {
         printf("####SID: %d out of range!####\n",tempData.sid);
     }
@@ -428,6 +433,7 @@ void loop() {
   if(Connected2Blynk){
     Blynk.run();
   }
+  timer.run();
 }
 
 void pushButtonHigh() {
@@ -562,7 +568,7 @@ void copySensorData(int sid) {
   char buffer [20] = "";
   sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second());
   sensorData[sid].dateTime = buffer;
-  delay(50);
+  delay(5);
 }
 
 void printToSerial(char *line, String time) {
@@ -752,20 +758,29 @@ BLYNK_WRITE(V4) {
 
 void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       BLYNK_LOG1(BLYNK_F("Arriva!"));
+      boolean currentLineIsBlank = true;
+      readString=F("");
       while (len) {
         if (client->getUart()->available()) {
-          client->getUart()->read();
+          char c = client->getUart()->read();
+          if (readString.length() < 100) {
+            readString+=c;
+          }
           len--;
+          
+
         }
       }
       uint8_t hello[] = "HTTP/1.1 200 OK\r\n"
-      "Content-Length: 24\r\n"
+      //"Content-Length: 24\r\n"
       "Server: ESP8266\r\n"
       "Content-Type: text/html\r\n"
       "Connection: keep-alive\r\n\r\n"
       "<h1>Hello ESP8266!!</h1>";
+      //client->send(mux_id, head, sizeof(head));
+      //delay(20);
       client->send(mux_id, hello, sizeof(hello));
-      delay(10);
+      //delay(20);
       if (client->releaseTCP(mux_id)) {
         BLYNK_LOG1(BLYNK_F("release tcp ok"));
       } else {

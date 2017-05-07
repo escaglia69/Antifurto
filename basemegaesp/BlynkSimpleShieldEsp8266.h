@@ -180,8 +180,20 @@ public:
                uint16_t    port   = BLYNK_DEFAULT_PORT)
     {
         config(esp8266, auth, domain, port);
-        connectWiFi(ssid, pass);
-        while(this->connect() != true) {}
+        while(connectWiFi(ssid, pass) != true) {BLYNK_LOG1(BLYNK_F(".."));}
+        while(this->connect() != true) {
+          Serial.println(wifi->getIPStatus());
+          BLYNK_LOG1(BLYNK_F("..."));
+        }
+    }
+
+    void reconnect()
+    {
+        if (this->connect()) {
+          BLYNK_LOG1(BLYNK_F("Reconnected!"));
+        } else {
+          BLYNK_LOG1(BLYNK_F("Reconnection failed!"));
+        }
     }
 
 private:
