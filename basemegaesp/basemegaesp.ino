@@ -175,7 +175,7 @@ void setup(void){
       Serial.print("multiple err\r\n");
   }*/
   
-  if (wifi.startTCPServer(8080)) {
+  /*if (wifi.startTCPServer(8080)) {
       Serial.print("start tcp server ok\r\n");
   } else {
       Serial.print("start tcp server err\r\n");
@@ -185,7 +185,7 @@ void setup(void){
       Serial.print("set tcp server timout 10 seconds\r\n");
   } else {
       Serial.print("set tcp server timout err\r\n");
-  }
+  }*/
   //server.begin();
 }
 
@@ -194,7 +194,7 @@ void CheckConnection(){
   if(!Connected2Blynk){
     Serial.println(F("Not connected"));
     //Blynk.connect(3000);  // timeout set to 10 seconds and then continue without Blynk
-    Blynk.reconnect();
+    Blynk.reconnect(ssid, pass);
   }
 }
 
@@ -704,7 +704,7 @@ void setAllExtDisabled() {
 
 BLYNK_CONNECTED() // runs every time Blynk connection is established
 {
-    if (isFirstConnect) 
+    //if (isFirstConnect) 
     {
       // Request server to re-send latest values for all pins
       Blynk.syncAll();

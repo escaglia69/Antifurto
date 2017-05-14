@@ -42,7 +42,7 @@ class BlynkTransportShieldEsp8266
     void onData(uint8_t mux_id, uint32_t len) {
         //BLYNK_LOG1(mux_id);
         if (mux_id != BLYNK_ESP8266_MUX) {
-            http_process(client, mux_id, len);
+            //http_process(client, mux_id, len);
             return;
         }
         //BLYNK_LOG2("Got ", len);
@@ -180,20 +180,45 @@ public:
                uint16_t    port   = BLYNK_DEFAULT_PORT)
     {
         config(esp8266, auth, domain, port);
-        while(connectWiFi(ssid, pass) != true) {BLYNK_LOG1(BLYNK_F(".."));}
+        /*Serial.println(wifi->getIPStatus());
+        connectWiFi(ssid, pass);
+        Serial.println(wifi->getIPStatus());
         while(this->connect() != true) {
           Serial.println(wifi->getIPStatus());
+          if (!wifi->getIPStatus().startsWith("STATUS:2")) {
+            connectWiFi(ssid, pass);
+            Serial.println("WIFI");
+          }
           BLYNK_LOG1(BLYNK_F("..."));
+        }*/
+        Serial.println(wifi->getIPStatus());
+        if (!wifi->getIPStatus().startsWith("STATUS:2")) {
+          connectWiFi(ssid, pass);
+        }
+        Serial.println(wifi->getIPStatus());
+        if (wifi->getIPStatus().startsWith("STATUS:2")) {
+          if (this->connect()) {
+            BLYNK_LOG1(BLYNK_F("Connected!"));
+          } else {
+            BLYNK_LOG1(BLYNK_F("Connection failed!"));
+          }
         }
     }
 
-    void reconnect()
+    void reconnect(const char* ssid, const char* pass)
     {
+      Serial.println(wifi->getIPStatus());
+      if (!wifi->getIPStatus().startsWith("STATUS:2")) {
+        connectWiFi(ssid, pass);
+      }
+      Serial.println(wifi->getIPStatus());
+      if (wifi->getIPStatus().startsWith("STATUS:2")) {
         if (this->connect()) {
-          BLYNK_LOG1(BLYNK_F("Reconnected!"));
+          BLYNK_LOG1(BLYNK_F("Connected!"));
         } else {
-          BLYNK_LOG1(BLYNK_F("Reconnection failed!"));
+          BLYNK_LOG1(BLYNK_F("Connection failed!"));
         }
+      }
     }
 
 private:
