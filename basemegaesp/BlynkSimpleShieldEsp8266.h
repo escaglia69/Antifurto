@@ -42,7 +42,7 @@ class BlynkTransportShieldEsp8266
     void onData(uint8_t mux_id, uint32_t len) {
         //BLYNK_LOG1(mux_id);
         if (mux_id != BLYNK_ESP8266_MUX) {
-            //http_process(client, mux_id, len);
+            http_process(client, mux_id, len);
             return;
         }
         //BLYNK_LOG2("Got ", len);
@@ -209,6 +209,7 @@ public:
     {
       Serial.println(wifi->getIPStatus());
       if (!wifi->getIPStatus().startsWith("STATUS:2")) {
+        //wifi->restart();
         connectWiFi(ssid, pass);
       }
       Serial.println(wifi->getIPStatus());

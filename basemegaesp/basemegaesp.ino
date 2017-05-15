@@ -1,4 +1,4 @@
-#define BLYNK_PRINT Serial
+//#define BLYNK_PRINT Serial
 //#include <SPI.h>
 //#include "nRF24L01.h"
 #include "RF24.h"
@@ -84,6 +84,7 @@ BlynkTimer timer;
 void setup(void){
   Serial.begin(115200);
   Serial.println("Setup!");
+  delay(10);
   //setAllIntEnabled();
   //getAllEnabled();
   //ApplicationMonitor.Dump(Serial);
@@ -95,9 +96,9 @@ void setup(void){
   //delay(1000);
   //lcd.setCursor(0,1);
   lcd.print(F("Avviato!"));
-  delay(300);  
+  delay(30);  
   rtc.begin();
-  delay(300);
+  delay(30);
   if (! rtc.isrunning()) {
     Serial.println(F("RTC is NOT running!"));
     // following line sets the RTC to the date & time this sketch was compiled
@@ -106,7 +107,7 @@ void setup(void){
     // January 21, 2014 at 3am you would call:
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
-  delay(300);
+  delay(30);
   DateTime now = rtc.now();
   sprintf(startedAt, "%02d/%02d/%04d %02d:%02d:%02d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second());
   Serial.print("Started at: ");
@@ -140,8 +141,6 @@ void setup(void){
   //if(!Ethernet.begin(mac)) {
     //Ethernet.begin(mac, manualIP, gateway, gateway, subnet);
   //}
-    // Set console baud rate
-  delay(10);
   // Set ESP8266 baud rate
   EspSerial.begin(ESP8266_BAUD);
   delay(10);
@@ -162,8 +161,8 @@ void setup(void){
       Serial.print("Join AP failure\r\n");
   }
   //Blynk.connectWiFi(ssid, pass);*/
-  delay(4000);
-  CheckConnection();
+  //delay(4000);
+  //CheckConnection();
   if (Blynk.connected()) {
      Serial.println(F("Rete in setup")); 
   }
@@ -175,7 +174,7 @@ void setup(void){
       Serial.print("multiple err\r\n");
   }*/
   
-  /*if (wifi.startTCPServer(8080)) {
+  if (wifi.startTCPServer(8080)) {
       Serial.print("start tcp server ok\r\n");
   } else {
       Serial.print("start tcp server err\r\n");
@@ -185,7 +184,7 @@ void setup(void){
       Serial.print("set tcp server timout 10 seconds\r\n");
   } else {
       Serial.print("set tcp server timout err\r\n");
-  }*/
+  }
   //server.begin();
 }
 
@@ -430,10 +429,10 @@ void loop() {
     client.stop();
     //Serial.println(F("Client disconnected"));
   }*/
-  if(Connected2Blynk){
+  timer.run();
+  if(Blynk.connected()){
     Blynk.run();
   }
-  timer.run();
 }
 
 void pushButtonHigh() {
