@@ -137,6 +137,10 @@ public:
             BLYNK_LOG1(BLYNK_F("Failed to restart"));
             return false;
         }*/
+        if (!wifi->kick()) {
+             BLYNK_LOG1(BLYNK_F("ESP is not responding"));
+             return false;
+        }
         if (!wifi->setEcho(0)) {
             BLYNK_LOG1(BLYNK_F("Failed to disable Echo"));
             return false;
@@ -148,6 +152,10 @@ public:
         }
         if (!wifi->setOprToStation()) {
             BLYNK_LOG1(BLYNK_F("Failed to set STA mode"));
+            return false;
+        }
+        if (!wifi->setStationIp("192.168.178.73","192.168.178.1","255.255.255.0",3)) {
+            BLYNK_LOG1(BLYNK_F("Failed to set IP"));
             return false;
         }
         if (wifi->joinAP(ssid, pass)) {
@@ -179,8 +187,7 @@ public:
                const char* domain = BLYNK_DEFAULT_DOMAIN,
                uint16_t    port   = BLYNK_DEFAULT_PORT)
     {
-        config(esp8266, auth, domain, port);
-        /*Serial.println(wifi->getIPStatus());
+         /*Serial.println(wifi->getIPStatus());
         connectWiFi(ssid, pass);
         Serial.println(wifi->getIPStatus());
         while(this->connect() != true) {
@@ -191,16 +198,30 @@ public:
           }
           BLYNK_LOG1(BLYNK_F("..."));
         }*/
+        config(esp8266, auth, domain, port);
         Serial.println(wifi->getIPStatus());
+        int mytimeout = millis() / 1000;
         if (!wifi->getIPStatus().startsWith("STATUS:2")) {
-          connectWiFi(ssid, pass);
+          while (connectWiFi(ssid, pass) == false) { 
+            if((millis() / 1000) > mytimeout + 8) {  // try for less than 9 seconds
+              break;
+            }
+          }
+          //connectWiFi(ssid, pass);
         }
         Serial.println(wifi->getIPStatus());
         if (wifi->getIPStatus().startsWith("STATUS:2")) {
-          if (this->connect()) {
+          /*if (this->connect()) {
             BLYNK_LOG1(BLYNK_F("Connected!"));
           } else {
             BLYNK_LOG1(BLYNK_F("Connection failed!"));
+          }*/
+          mytimeout = millis() / 1000;
+          while (this->connect() == false) {
+            if((millis() / 1000) > mytimeout + 8) {  // try for less than 9 seconds
+              BLYNK_LOG1(BLYNK_F("Connection failed!"));
+              break;
+            }
           }
         }
     }
@@ -208,16 +229,28 @@ public:
     void reconnect(const char* ssid, const char* pass)
     {
       Serial.println(wifi->getIPStatus());
+      int mytimeout = millis() / 1000;
       if (!wifi->getIPStatus().startsWith("STATUS:2")) {
-        //wifi->restart();
-        connectWiFi(ssid, pass);
+        while (connectWiFi(ssid, pass) == false) { 
+          if((millis() / 1000) > mytimeout + 8) {  // try for less than 9 seconds
+            break;
+          }
+        }
+        //connectWiFi(ssid, pass);
       }
       Serial.println(wifi->getIPStatus());
       if (wifi->getIPStatus().startsWith("STATUS:2")) {
-        if (this->connect()) {
+        /*if (this->connect()) {
           BLYNK_LOG1(BLYNK_F("Connected!"));
         } else {
           BLYNK_LOG1(BLYNK_F("Connection failed!"));
+        }*/
+        mytimeout = millis() / 1000;
+        while (this->connect() == false) {
+          if((millis() / 1000) > mytimeout + 8) {  // try for less than 9 seconds
+            BLYNK_LOG1(BLYNK_F("Connection failed!"));
+            break;
+          }
         }
       }
     }

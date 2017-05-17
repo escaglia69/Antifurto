@@ -1,4 +1,4 @@
-//#define BLYNK_PRINT Serial
+#define BLYNK_PRINT Serial
 //#include <SPI.h>
 //#include "nRF24L01.h"
 #include "RF24.h"
@@ -84,7 +84,7 @@ BlynkTimer timer;
 void setup(void){
   Serial.begin(115200);
   Serial.println("Setup!");
-  delay(10);
+  //delay(10);
   //setAllIntEnabled();
   //getAllEnabled();
   //ApplicationMonitor.Dump(Serial);
@@ -93,12 +93,11 @@ void setup(void){
   lcd.noBacklight(); // finish with backlight on
   lcd.setCursor(0,0); //Start at character 4 on line 0
   //lcd.print(F("Allarme 1.0"));
-  //delay(1000);
   //lcd.setCursor(0,1);
   lcd.print(F("Avviato!"));
-  delay(30);  
+  //delay(30);  
   rtc.begin();
-  delay(30);
+  //delay(30);
   if (! rtc.isrunning()) {
     Serial.println(F("RTC is NOT running!"));
     // following line sets the RTC to the date & time this sketch was compiled
@@ -107,7 +106,7 @@ void setup(void){
     // January 21, 2014 at 3am you would call:
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
-  delay(30);
+  //delay(30);
   DateTime now = rtc.now();
   sprintf(startedAt, "%02d/%02d/%04d %02d:%02d:%02d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second());
   Serial.print("Started at: ");
@@ -143,7 +142,7 @@ void setup(void){
   //}
   // Set ESP8266 baud rate
   EspSerial.begin(ESP8266_BAUD);
-  delay(10);
+  //delay(10);
   //wifi.enableMUX();
   Blynk.begin(auth, wifi, ssid, pass);
   //Blynk.config(wifi, ssid);
@@ -192,7 +191,7 @@ void CheckConnection(){
   Connected2Blynk = Blynk.connected();
   if(!Connected2Blynk){
     Serial.println(F("Not connected"));
-    //Blynk.connect(3000);  // timeout set to 10 seconds and then continue without Blynk
+    //Blynk.connect(10000);  // timeout set to 10 seconds and then continue without Blynk
     Blynk.reconnect(ssid, pass);
   }
 }
@@ -457,8 +456,8 @@ void pushButtonHigh() {
         armed = !armed;
         greenLedState = !greenLedState;
         Blynk.virtualWrite(V0,armed);
+        digitalWrite(greenLedPin, greenLedState);
       }
-      digitalWrite(greenLedPin, greenLedState);
     } else {
         if (highButtonState == LOW) {
         if (highButtonActive == false) {
@@ -567,7 +566,7 @@ void copySensorData(int sid) {
   char buffer [20] = "";
   sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second());
   sensorData[sid].dateTime = buffer;
-  delay(5);
+  //delay(5);
 }
 
 void printToSerial(char *line, String time) {
