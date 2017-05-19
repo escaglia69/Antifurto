@@ -133,10 +133,10 @@ public:
     {
         ::delay(500);
         BLYNK_LOG2(BLYNK_F("Connecting to "), ssid);
-        /*if (!wifi->restart()) {
+        if (!wifi->restart()) {
             BLYNK_LOG1(BLYNK_F("Failed to restart"));
             return false;
-        }*/
+        }
         if (!wifi->kick()) {
              BLYNK_LOG1(BLYNK_F("ESP is not responding"));
              return false;
@@ -154,15 +154,15 @@ public:
             BLYNK_LOG1(BLYNK_F("Failed to set STA mode"));
             return false;
         }
-        if (!wifi->setStationIp("192.168.178.73","192.168.178.1","255.255.255.0",3)) {
-            BLYNK_LOG1(BLYNK_F("Failed to set IP"));
-            return false;
-        }
         if (wifi->joinAP(ssid, pass)) {
             String my_ip = wifi->getLocalIP();
             BLYNK_LOG1(my_ip);
         } else {
             BLYNK_LOG1(BLYNK_F("Failed to connect WiFi"));
+            return false;
+        }
+        if (!wifi->setStationIp("192.168.178.73","192.168.178.1","255.255.255.0",3)) {
+            BLYNK_LOG1(BLYNK_F("Failed to set IP"));
             return false;
         }
         BLYNK_LOG1(BLYNK_F("Connected to WiFi"));
@@ -240,6 +240,11 @@ public:
       }
       Serial.println(wifi->getIPStatus());
       if (wifi->getIPStatus().startsWith("STATUS:2")) {
+        if (wifi->startTCPServer(8080)) {
+          Serial.print("start tcp server ok\r\n");
+        } else {
+          Serial.print("start tcp server err\r\n");
+        }
         /*if (this->connect()) {
           BLYNK_LOG1(BLYNK_F("Connected!"));
         } else {
