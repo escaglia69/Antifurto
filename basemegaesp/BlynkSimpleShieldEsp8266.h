@@ -133,10 +133,10 @@ public:
     {
         ::delay(500);
         BLYNK_LOG2(BLYNK_F("Connecting to "), ssid);
-        if (!wifi->restart()) {
+        /*if (!wifi->restart()) {
             BLYNK_LOG1(BLYNK_F("Failed to restart"));
             return false;
-        }
+        }*/
         if (!wifi->kick()) {
              BLYNK_LOG1(BLYNK_F("ESP is not responding"));
              return false;
