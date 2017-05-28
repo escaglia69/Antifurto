@@ -808,6 +808,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               memcpy(msg+36+offset,"\"\n}",3);
               reslen=offset+39;
             }
+            tmpid[0] = '\0';
             break;
           }
           if (c == '\n') {
