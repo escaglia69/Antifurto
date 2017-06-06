@@ -31,7 +31,7 @@
 #include <utility/BlynkFifo.h>
 #include <ESP8266_Lib.h>
 
-extern void http_process(ESP8266* client, uint8_t mux_id, uint32_t len);
+void http_process(ESP8266* client, uint8_t mux_id, uint32_t len);
 
 class BlynkTransportShieldEsp8266
 {
@@ -49,7 +49,7 @@ class BlynkTransportShieldEsp8266
         while (len) {
             if (client->getUart()->available()) {
                 uint8_t b = client->getUart()->read();
-                if(!buffer.push(b)) {
+                 if(!buffer.push(b)) {
                     BLYNK_LOG1(BLYNK_F("Buffer overflow"));
                 }
                 len--;

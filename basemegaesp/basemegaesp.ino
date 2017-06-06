@@ -1,4 +1,4 @@
-//#define BLYNK_PRINT Serial
+#define BLYNK_PRINT Serial
 #include "RF24.h"
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -64,15 +64,20 @@ boolean dhcpConnected = false;
 boolean armed = false;
 boolean alarm = false;
 boolean alarmSent = false;
-String readString = String(100);
+//char readString[100] = {0};
 char lcdl[33];
 bool Connected2Blynk = false;
 char startedAt[20] = "";
 char tmpid[2] = "";
-uint8_t jsonline[128];
-int jsonlinel = 0;
-int reslen = 0;
+char jsonline[128] ={0};
+//int reslen = 0;
 tmElements_t tm;
+//uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
+uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
+"Server: ESP8266\n"
+"Content-Type: text/plain;charset=utf-8\n"
+"Connnection: close\n\n";
+
 
 #define EspSerial Serial3
 #define ESP8266_BAUD 115200
@@ -141,8 +146,8 @@ void setup(void){
       Serial.print("start tcp server err\r\n");
   }
   
-  if (wifi.setTCPServerTimeout(5)) { 
-      Serial.print("set tcp server timout 10 seconds\r\n");
+  if (wifi.setTCPServerTimeout(2)) { 
+      Serial.print("set tcp server timout 2 seconds\r\n");
   } else {
       Serial.print("set tcp server timout err\r\n");
   }
@@ -313,7 +318,7 @@ void arm() {
   greenLedState = HIGH;
   digitalWrite(greenLedPin,greenLedState);
   Blynk.virtualWrite(V0,1);
-  Serial.println(F("Armato!"));
+  //Serial.println(F("Armato!"));
 }
 
 void unarm() {
@@ -321,7 +326,7 @@ void unarm() {
   greenLedState = LOW;
   digitalWrite(greenLedPin,greenLedState);
   Blynk.virtualWrite(V0,0);
-  Serial.println(F("Disarmato!"));
+  //Serial.println(F("Disarmato!"));
 }
 
 void resetAlarm() {
@@ -349,13 +354,14 @@ void copySensorData(int sid) {
   //delay(5);
 }
 
-void printToSerial(char *line, String time) {
+void printToSerial(char *line, char time[20]) {
   Serial.print(line);
-  Serial.println(" "+time);
+  Serial.print(" ");
+  Serial.println(time);
 }
 
 
-void printToSerial(int sid) {
+/*void printToSerial(int sid) {
     Serial.print(F("Id: "));
     Serial.print(sensorData[sid].sid);
     Serial.print(F(" Temp: "));
@@ -369,7 +375,7 @@ void printToSerial(int sid) {
     Serial.print(F(" Time: "));
     Serial.println(sensorData[sid].dateTime);
     //delay(100);
-}
+}*/
 char *lcdLine(int sid) {
     char temp[6];
     char vcc[5];
@@ -395,22 +401,24 @@ void printOnWLCD(char *line) {
   }
 }
 
-int getId(int offset) {
-  String inString="";
-  char inChar = readString.charAt(offset);
+/*int getId(int offset) {
+  char inStr[2] = {0};
+  char inChar = readString[offset];
+  int id;
   if (isDigit(inChar)) {
     // convert the incoming byte to a char
     // and add it to the string:
-    inString += inChar;
-    inChar = readString.charAt(offset+1);
+    inStr[0] = inChar;
+    inChar = readString[offset+1];
     if (isDigit(inChar)) {
-      inString += inChar;
+      inStr[1] = inChar;
     }
-    return inString.toInt();
+    sprintf(id,"%2d",inStr);
+    return id;
   } else {
     return -1;
   }
-}
+}*/
 
 void enableIntId(int id) {
   EEPROM.write(id*2, 1);  
@@ -520,6 +528,13 @@ BLYNK_WRITE(V4) {
   }
 }
 
+BLYNK_WRITE(V7) {
+  if (param.asInt()) {
+    //printToJSON();
+    //Serial.println(msg);
+  }
+}
+
 void clockDisplay()
 {
   // You can call hour(), minute(), ... at any time
@@ -544,11 +559,7 @@ int printToJSON(uint8_t (*row)[128], int sid) {
     char vcc[4];
     dtostrf(sensorData[sid].temp,5, 2, temp);
     dtostrf(sensorData[sid].vcc,4, 2, vcc);
-    memcpy(*row,"\t{\"Id\":\"",8);
-    tmpid[0]=' ';
-    sprintf(tmpid,"%2d",sensorData[sid].sid);
-    memcpy(*row+8,tmpid,2);
-    memcpy(*row+10,"\", \"Temp\":\"",11);
+    sprintf(*row,"\t{\"Id\":\"%2d\", \"Temp\":\"",sensorData[sid].sid);
     memcpy(*row+21,temp,5);
     memcpy(*row+26,"\", \"Int door\":\"",15);
     sprintf(tmpid,"%1d",sensorData[sid].intDoor,1);
@@ -571,186 +582,224 @@ int printToJSON(uint8_t (*row)[128], int sid) {
 
 void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       BLYNK_LOG1(BLYNK_F("Arriva!"));
+      Serial.print("LEN: ");
+      Serial.println(len);
       boolean currentLineIsBlank = true;
-      readString=F("");
-      uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
+      char received[128] = {0};
+      char command[128] ={0};
+      /*uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
       "Server: ESP8266\n"
       "Content-Type: text/plain;charset=utf-8\n"
-      "Connnection: close\n\n";
+      "Connnection: close\n\n";*/
+      //uint8_t *msg=(uint8_t*)malloc(2048);
+      //*msg = '\0';
+      //uint8_t msg[2048] = {0};
+      int reslen = 91;
+      if (len>127) {
+        len=127;
+      }
+      char c ;
+      int ii=0;
+      /*while(client->getUart()->available() && ii<len) {
+        c = client->getUart()->read();
+        received[ii++]=c;
+      }*/
       while (len) {
-        if (client->getUart()->available()) {
-          char c = client->getUart()->read();
-          if (readString.length() < 100) {
-            readString+=c;
+          if ((client->getUart()->available()) && (ii<128)) {
+              c = client->getUart()->read();
+              Serial.print(c);
+              len--;
+              received[ii++]=c;
           }
-          len--;
-          if (c == '\n' && currentLineIsBlank) {
-            // send a standard http response header
-            if (readString.startsWith(F("GET /set?"))) {
-              int id = getId(9);
-              if ((id >=0) && (id < SENSOR_NUM)) {
-                char rs[32] = "";
-                readString.toCharArray(rs, readString.length()+1);
-                String temp1 = strtok(rs,"|");
-                temp1 = strtok(NULL,"|");
-                tempData.temp = temp1.toFloat();
-                temp1 = strtok(NULL,"|");
-                tempData.intDoor = temp1=="1"?1:0;
-                //Serial.print(F("IntDoor: "));
-                //Serial.println(temp1);
-                temp1 = strtok(NULL,"|");
-                tempData.extDoor = temp1=="1"?1:0;
-                //Serial.print(F("ExtDoor: "));
-                //Serial.println(temp1);
-                temp1 = strtok(NULL,"|");
-                tempData.vcc = temp1.toFloat();
-                copySensorData(id);
-                lcdLine(id);
-                printToSerial(lcdl,sensorData[id].dateTime);
-                printOnLCD(lcdl);
-                printOnWLCD(lcdl);
-              } else {
-                memcpy(msg+91,"ERROR: Unvalid id\n",18);
-              }
-            } else if (readString.startsWith(F("GET /help"))) {
-              memcpy(msg+91,"arm\n",4);
-              memcpy(msg+95,"unarm\n",6);
-              memcpy(msg+101,"resetalarm\n",11);
-              memcpy(msg+112,"allIntEnabled\n",14);
-              memcpy(msg+126,"allIntDisabled\n",15);
-              memcpy(msg+141,"allExtEnabled\n",14);
-              memcpy(msg+155,"allExtDisabled\n",15);
-              memcpy(msg+170,"printEnabled\n",13);
-              memcpy(msg+183,"intEnable?id=\n",14);
-              memcpy(msg+197,"intDisable?id=\n",15);
-              memcpy(msg+212,"extEnable?id=\n",14);
-              memcpy(msg+226,"extDisable?id=\n",15);
-              memcpy(msg+241,"sync\n",5);
-              reslen=246;
-            } else if (readString.startsWith(F("GET /arm"))) {
-              arm();
-              memcpy(msg+91,"Armed\n",6);
-              reslen=97;
-            } else if (readString.startsWith(F("GET /unarm"))) {
-              unarm();
-              memcpy(msg+91,"Unarmed\n",8);
-              reslen=99;
-            } else if (readString.startsWith(F("GET /resetalarm"))) {
-              resetAlarm();
-              memcpy(msg+91,"Alarm reset\n",12);
-              reslen=103;
-            } else if (readString.startsWith(F("GET /allIntEnabled"))) {
-              setAllIntEnabled();
-              memcpy(msg+91,"All internal enabled\n",21);
-              reslen=112;
-            } else if (readString.startsWith(F("GET /allIntDisabled"))) {
-              setAllIntDisabled();
-              memcpy(msg+91,"All internal disabled\n",22);
-              reslen=113;
-            } else if (readString.startsWith(F("GET /allExtEnabled"))) {
-              setAllExtEnabled();
-              memcpy(msg+91,"All external enabled\n",21);
-              reslen=112;
-            } else if (readString.startsWith(F("GET /allExtDisabled"))) {
-              setAllExtDisabled();
-              memcpy(msg+91,"All external disabled\n",22);
-              reslen=113;
-            } else if (readString.startsWith(F("GET /printEnabled"))) {
-              reslen=printAllEnabled(&msg);
-            } else if (readString.startsWith(F("GET /sync"))) {
-              clockDisplay();
-              memcpy(msg+91,"Time synced\n",12);
-              reslen=103;
-            } else if (readString.startsWith(F("GET /intEnable?id="))) {
-              int id = getId(18);
-              if ((id >=0) && (id < SENSOR_NUM)) {
-                enableIntId(id);
-                memcpy(msg+91,"Int.Gate ",9);
-                tmpid[0]=' ';
-                sprintf(tmpid,"%2d",id);
-                memcpy(msg+100,tmpid,2);
-                memcpy(msg+102," enabled\n",9);
-                reslen=111;
-              } else {
-                memcpy(msg+91,"ERROR: Unvalid id\n",18);
-                reslen=109;
-              }
-            } else if (readString.startsWith(F("GET /intDisable?id="))) {
-              int id = getId(19);
-              if ((id >=0) && (id < SENSOR_NUM)) {
-                disableIntId(id);
-                memcpy(msg+91,"Int.Gate ",9);
-                tmpid[0]=' ';
-                sprintf(tmpid,"%2d",id);
-                memcpy(msg+100,tmpid,2);
-                memcpy(msg+102," disabled\n",10);
-                reslen=112;         
-              } else {
-                memcpy(msg+91,"ERROR: Unvalid id\n",18);
-                reslen=109;
-              }
-            } else if (readString.startsWith(F("GET /extEnable?id="))) {
-              int id = getId(18);
-              if ((id >=0) && (id < SENSOR_NUM)) {
-                enableExtId(id);
-                memcpy(msg+91,"Ext.Gate ",9);
-                tmpid[0]=' ';
-                sprintf(tmpid,"%2d",id);
-                memcpy(msg+100,tmpid,2);
-                memcpy(msg+102," enabled\n",9);
-                reslen=111;
-              } else {
-                memcpy(msg+91,"ERROR: Unvalid id\n",18);
-                reslen=109;
-              }
-            } else if (readString.startsWith(F("GET /extDisable?id="))) {
-              int id = getId(19);
-              if ((id >=0) && (id < SENSOR_NUM)) {
-                disableExtId(id);
-                memcpy(msg+91,"Ext.Gate ",9);
-                tmpid[0]=' ';
-                sprintf(tmpid,"%2d",id);
-                memcpy(msg+100,tmpid,2);
-                memcpy(msg+102," disabled\n",10);
-                reslen=112;
-              } else {
-                memcpy(msg+91,"ERROR: Unvalid id\n",18);
-                reslen=109;
-              }
+      }
+      received[ii]='\0';
+      Serial.println(received);
+      
+      if (strncmp(received, "GET ", 4) == 0) {
+        Serial.println("OKKKKK1");
+        /*const char *ptr = NULL;
+        if ((ptr = strchr(received+4, ' ')) == NULL) {
+          Serial.println("KKKOOOO");
+            //perror("GET too long!");
+        }
+        int index = ptr-&(received[4]);
+        strncpy(command,received+4,index);
+        //command[index]=0;
+        Serial.println(command);*/
+        if (strncmp(received+4,"/arm",4) == 0) {
+            Serial.println("OKKKKK2");
+            arm();
+            sprintf(msg+91,"Armed\n");
+            reslen=97;
+        } else if (strncmp(received+4,"/unarm",6) == 0) {
+            unarm();
+            sprintf(msg+91,"Unarmed\n");
+            reslen=99;
+        } else if (strncmp(received+4,"/resetalarm",7) == 0) {
+            resetAlarm();
+            sprintf(msg+91,"Alarm reset\n");
+            reslen=103;
+        } else if (strncmp(received+4,"/help",5) == 0) {
+            msg[91] = '\0';
+            strcat(msg+91,"arm\nunarm\nresetalarm\nallIntEnabled\nallIntDisabled\n");
+            strcat(msg+91,"allExtEnabled\nallExtDisabled\nprintEnabled\nintEnable?id=\n");
+            strcat(msg+91,"intDisable?id=\nextEnable?id=\nextDisable?id=\nsync\n");
+            reslen=246;
+        } else if (strncmp(received+4,"/allIntEnabled",14) == 0) {
+            setAllIntEnabled();
+            msg[91] = '\0';
+            strcat(msg+91,"All internal enabled\n");
+            reslen=112;
+        } else if (strncmp(received+4,"/allIntDisabled",15) == 0) {
+            setAllIntDisabled();
+            msg[91] = '\0';
+            strcat(msg+91,"All internal disabled\n");
+            reslen=113;
+        } else if (strncmp(received+4,"/allExtEnabled",14) == 0) {
+            setAllExtEnabled();
+            msg[91] = '\0';
+            strcat(msg+91,"All external enabled\n");
+            reslen=112;
+        } else if (strncmp(received+4,"/allExtDisabled",15) == 0) {
+            setAllExtDisabled();
+            msg[91] = '\0';
+            strcat(msg+91,"All external disabled\n");
+            reslen=113;
+        } else if (strncmp(received+4,"/printEnabled",13) == 0) {
+            reslen=printAllEnabled(&msg);
+        } else if (strncmp(received+4,"/intEnable?id=",14) == 0) {
+            int id = atoi(&received[18]);
+            if ((id >=0) && (id < SENSOR_NUM)) {
+              enableIntId(id);
+              sprintf(msg+91,"Int.Gate %2d enabled\n",id);
+              reslen=111;
             } else {
-              memcpy(msg+91,"{\"Sensor\": [\n",13);
-              int offset=104;
-              for (int idd=0; idd<SENSOR_NUM; idd++) {
-                jsonline[0] = '\0';
-                jsonlinel=printToJSON(&jsonline, idd);
-                memcpy(msg+offset,jsonline,jsonlinel);
-                offset+=jsonlinel;
-              }
-              memcpy(msg+offset,"],\n\"Started at\":\"",17);
-              memcpy(msg+17+offset,startedAt,19);
-              memcpy(msg+36+offset,"\"\n}",3);
-              reslen=offset+39;
+              sprintf(msg+91,"ERROR: Unvalid id\n");
+              reslen=109;
             }
-            tmpid[0] = '\0';
-            break;
-          }
-          if (c == '\n') {
-            currentLineIsBlank = true;
-          }
-          else if (c!= '\r') {
-            currentLineIsBlank = false;
-          }
-
+        } else if (strncmp(received+4,"/intDisable?id=",15) == 0) {
+            int id = atoi(&received[19]);
+            if ((id >=0) && (id < SENSOR_NUM)) {
+              disableIntId(id);
+              sprintf(msg+91,"Int.Gate %2d disabled\n",id);
+              reslen=112;
+            } else {
+              sprintf(msg+91,"ERROR: Unvalid id\n");
+              reslen=109;
+            }
+        } else if (strncmp(received+4,"/extEnable?id=",14) == 0) {
+            int id = atoi(&received[18]);
+            if ((id >=0) && (id < SENSOR_NUM)) {
+              enableExtId(id);
+              sprintf(msg+91,"Ext.Gate %2d enabled\n",id);
+              reslen=111;            
+            } else {
+              sprintf(msg+91,"ERROR: Unvalid id\n");
+              reslen=109;
+            }
+        } else if (strncmp(received+4,"/extDisable?id=",15) == 0) {
+            int id = atoi(&received[19]);
+            if ((id >=0) && (id < SENSOR_NUM)) {
+              disableExtId(id);
+              sprintf(msg+91,"Ext.Gate %2d disabled\n",id);
+              reslen=112;
+            } else {
+              sprintf(msg+91,"ERROR: Unvalid id\n");
+              reslen=109;
+            }
+        } else {
+          printToJSON();
+          //Serial.println(msg);
+          reslen=117*SENSOR_NUM+144;
+            /*char *json=printToJSON();
+            sprintf(msg+91,"%s",json);
+            free(json);
+            strcat(msg,"{\"Sensor\": [\n");
+            int offset=13;
+            for (int idd=0; idd<SENSOR_NUM; idd++) {
+              char *line=printLineToJSON(idd);
+              strcat(msg,line);
+              offset+=sizeof(line);
+              free(line);
+            }
+            char tmp[40] = "";
+            sprintf(tmp,"],\n\"Started at\":\"%s\"\n}",startedAt);
+            strcat(msg,tmp);
+            strcat(hmsg,msg);
+            reslen=91;//+offset+40;*/
         }
       }
-
+      
       client->send(mux_id, msg, reslen);
-      msg[0] ='\0';
+      //msg[0] ='\0';
       if (client->releaseTCP(mux_id)) {
         BLYNK_LOG1(BLYNK_F("release tcp ok"));
       } else {
         BLYNK_LOG1(BLYNK_F("release tcp err"));
       }
       return;
+}
+
+/*char *printLineToJSON(int sid) {
+  char *line=(char*)malloc(128);
+  char temp[6];
+  char vcc[5];
+  dtostrf(sensorData[sid].temp,5, 2, temp);
+  dtostrf(sensorData[sid].vcc,4, 2, vcc);
+  snprintf(line,128,"\t{\"Id\":\"%2d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Battery V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
+  if (sid == SENSOR_NUM-1 ) {
+    strcat(line,"\"}\n");
+  } else {
+    strcat(line,"\"},\n");
+  }
+  return line;
+}
+
+char *printToJSON() {
+  //char json[2048] = {0};
+  //char line[128];
+  char *json = (char*)malloc(2048);
+  *json = '\0';
+  strcat(json,"{\"Sensor\": [\n");
+  for (int id=0; id<SENSOR_NUM; id++) {
+    //strcat(json,printLineToJSON(id));
+    char *line=printLineToJSON(id);
+    strcat(json,line);
+    free(line);
+    //printf("%s",line);
+  }
+  strcat(json,"],\n\"Started at:\":\"");
+  strcat(json,startedAt);
+  strcat(json,"\"\n}\n");
+  //printf(json);
+  return json;
+}*/
+
+void printLineToJSON(int sid) {
+  jsonline[0] = '\0';
+  char temp[6];
+  char vcc[5];
+  dtostrf(sensorData[sid].temp,5, 2, temp);
+  dtostrf(sensorData[sid].vcc,4, 2, vcc);
+  snprintf(jsonline,128,"\t{\"Id\":\"%2d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Battery V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
+  if (sid == SENSOR_NUM-1 ) {
+    strcat(jsonline,"\"}\n");
+  } else {
+    strcat(jsonline,"\"},\n");
+  }
+}
+
+void printToJSON() {
+  msg[91] = '\0';
+  strcat(msg+91,"{\"Sensor\": [\n");
+  for (int id=0; id<SENSOR_NUM; id++) {
+    //strcat(json,printLineToJSON(id));
+    printLineToJSON(id);
+    strcat(msg+91,jsonline);
+    //printf("%s",line);
+  }
+  strcat(msg+91,"],\n\"Started at:\":\"");
+  strcat(msg+91,startedAt);
+  strcat(msg+91,"\"\n}\n");
 }
 
