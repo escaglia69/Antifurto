@@ -364,6 +364,12 @@ void printToSerial(char *line, char time[20]) {
 char *lcdLine(int sid) {
     char temp[6];
     char vcc[5];
+    if (sensorData[sid].temp < 0) {
+      sensorData[sid].temp=-sensorData[sid].temp;
+    }
+    if (sensorData[sid].vcc < 0) {
+      sensorData[sid].vcc=-sensorData[sid].vcc;
+    }
     dtostrf(sensorData[sid].temp,5, 2, temp);
     dtostrf(sensorData[sid].vcc,4, 2, vcc);
     sprintf(lcdl,"Id:%2d Temp:%5.5sIn:%1d Ex:%1d V:%4.4s",sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc);
