@@ -64,15 +64,12 @@ boolean dhcpConnected = false;
 boolean armed = false;
 boolean alarm = false;
 boolean alarmSent = false;
-//char readString[100] = {0};
 char lcdl[33];
 bool Connected2Blynk = false;
 char startedAt[20] = "";
 char tmpid[2] = "";
 char jsonline[128] ={0};
-//int reslen = 0;
 tmElements_t tm;
-//uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
 uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
 "Server: ESP8266\n"
 "Content-Type: text/plain;charset=utf-8\n"
@@ -136,6 +133,7 @@ void setup(void){
 
   if (Blynk.connected()) {
     Serial.println(F("Rete in setup"));
+    Blynk.virtualWrite(V9, 0);
     brtc.begin();
   }
   timer.setInterval(60000L, CheckConnection);
@@ -146,7 +144,7 @@ void setup(void){
       Serial.print("start tcp server err\r\n");
   }
   
-  if (wifi.setTCPServerTimeout(2)) { 
+  if (wifi.setTCPServerTimeout(4)) { 
       Serial.print("set tcp server timout 2 seconds\r\n");
   } else {
       Serial.print("set tcp server timout err\r\n");
@@ -155,18 +153,21 @@ void setup(void){
 }
 
 void CheckConnection(){
+  Connected2Blynk = Blynk.connected();
+  if(!Connected2Blynk){
+    Serial.println(F("Not connected"));
+    Blynk.reconnect(ssid, pass);
+  }
+}
+
+void sync() {
   tm.Year = CalendarYrToTm(year());
   tm.Month = month();
   tm.Day = day();
   tm.Hour = hour();
   tm.Minute = minute();
   tm.Second = second();
-  RTC.write(tm);
-  Connected2Blynk = Blynk.connected();
-  if(!Connected2Blynk){
-    Serial.println(F("Not connected"));
-    Blynk.reconnect(ssid, pass);
-  }
+  RTC.write(tm);  
 }
 
 void loop() {
@@ -205,10 +206,10 @@ void loop() {
       printToSerial(lcdl,sensorData[sid].dateTime);
       printOnLCD(lcdl);
       printOnWLCD(lcdl);
-      //clockDisplay();
-      //CheckConnection();
     } else {
-        printf("####SID: %d out of range!####\n",tempData.sid);
+      Serial.print("####SID: %2d out of range!#### ");
+      Serial.println(tempData.sid);
+      //printf("####SID: %2d out of range!####\n",tempData.sid);
     }
   }
 
@@ -360,28 +361,12 @@ void printToSerial(char *line, char time[20]) {
   Serial.println(time);
 }
 
-
-/*void printToSerial(int sid) {
-    Serial.print(F("Id: "));
-    Serial.print(sensorData[sid].sid);
-    Serial.print(F(" Temp: "));
-    Serial.print(sensorData[sid].temp, DEC);
-    Serial.print(F( " Int: "));
-    Serial.print(sensorData[sid].intDoor);  
-    Serial.print(F(" Ext: "));
-    Serial.print(sensorData[sid].extDoor);
-    Serial.print(F(" V: "));
-    Serial.print(sensorData[sid].vcc);
-    Serial.print(F(" Time: "));
-    Serial.println(sensorData[sid].dateTime);
-    //delay(100);
-}*/
 char *lcdLine(int sid) {
     char temp[6];
     char vcc[5];
     dtostrf(sensorData[sid].temp,5, 2, temp);
     dtostrf(sensorData[sid].vcc,4, 2, vcc);
-    sprintf(lcdl,"Id:%2d Temp:%sIn:%1d Ex:%1d V:%s",sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc);
+    sprintf(lcdl,"Id:%2d Temp:%5.5sIn:%1d Ex:%1d V:%4.4s",sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc);
     return lcdl;
 }
 void printOnLCD(char *line) {
@@ -398,27 +383,9 @@ void printOnWLCD(char *line) {
   if (!alarm) {
     wlcd.clear();
     wlcd.print(0,0,line);
+    Blynk.virtualWrite(V8, EEPROM.read(sidOnDisplay*2));
   }
 }
-
-/*int getId(int offset) {
-  char inStr[2] = {0};
-  char inChar = readString[offset];
-  int id;
-  if (isDigit(inChar)) {
-    // convert the incoming byte to a char
-    // and add it to the string:
-    inStr[0] = inChar;
-    inChar = readString[offset+1];
-    if (isDigit(inChar)) {
-      inStr[1] = inChar;
-    }
-    sprintf(id,"%2d",inStr);
-    return id;
-  } else {
-    return -1;
-  }
-}*/
 
 void enableIntId(int id) {
   EEPROM.write(id*2, 1);  
@@ -460,19 +427,6 @@ void setAllExtDisabled() {
   }
 }
 
-int printAllEnabled(uint8_t (*msg)[2048]) {
-  int offs = 91,addr=0;
-  for (addr=0; addr<SENSOR_NUM*2; addr++) {
-    tmpid[0]=' ';
-    sprintf(tmpid,"%2d",addr);
-    memcpy(*msg+offs+addr*5,tmpid,2);
-    memcpy(*msg+offs+2+addr*5,"\t",1);
-    memcpy(*msg+offs+3+addr*5,EEPROM.read(addr)==0?"0":"1",1);
-    memcpy(*msg+offs+4+addr*5,"\n",1);
-  }
-  return offs+5*addr;
-}
-
 BLYNK_CONNECTED() // runs every time Blynk connection is established
 {
     //if (isFirstConnect) 
@@ -497,7 +451,7 @@ BLYNK_WRITE(V0) {
 
 BLYNK_WRITE(V6) {
   if (param.asInt()) {
-    Blynk.virtualWrite(V6, 0);;
+    Blynk.virtualWrite(V6, 0);
     Serial.println("V6");
   } else {
     resetAlarm();
@@ -530,8 +484,23 @@ BLYNK_WRITE(V4) {
 
 BLYNK_WRITE(V7) {
   if (param.asInt()) {
-    //printToJSON();
-    //Serial.println(msg);
+    sync();
+  }
+}
+
+BLYNK_WRITE(V8) {
+  if (param.asInt()) {
+    enableIntId(sidOnDisplay);
+  } else {
+    disableIntId(sidOnDisplay);
+  }
+}
+
+BLYNK_WRITE(V9) {
+  if (param.asInt()) {
+    lcd.backlight();
+  } else {
+    lcd.noBacklight();
   }
 }
 
@@ -554,91 +523,48 @@ void clockDisplay()
   Blynk.virtualWrite(V2, currentDate);
 }
 
-int printToJSON(uint8_t (*row)[128], int sid) {
-    char temp[5];
-    char vcc[4];
-    dtostrf(sensorData[sid].temp,5, 2, temp);
-    dtostrf(sensorData[sid].vcc,4, 2, vcc);
-    sprintf(*row,"\t{\"Id\":\"%2d\", \"Temp\":\"",sensorData[sid].sid);
-    memcpy(*row+21,temp,5);
-    memcpy(*row+26,"\", \"Int door\":\"",15);
-    sprintf(tmpid,"%1d",sensorData[sid].intDoor,1);
-    memcpy(*row+41,tmpid,1);
-    memcpy(*row+42,"\", \"Ext door\":\"",15);
-    sprintf(tmpid,"%1d",sensorData[sid].extDoor,1);
-    memcpy(*row+57,tmpid,1);
-    memcpy(*row+58,"\", \"Battery V\":\"",16);
-    memcpy(*row+74,vcc,4);
-    memcpy(*row+78,"\", \"Read time\":\"",16);
-    memcpy(*row+94,sensorData[sid].dateTime,19);
-    if (sid == SENSOR_NUM-1 ) {
-      memcpy(*row+113,"\"}\n",3);
-      return 116;
-    } else {
-      memcpy(*row+113,"\"},\n",4);
-      return 117;
-    }
-}
-
 void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       BLYNK_LOG1(BLYNK_F("Arriva!"));
       Serial.print("LEN: ");
       Serial.println(len);
       boolean currentLineIsBlank = true;
-      char received[128] = {0};
-      char command[128] ={0};
-      /*uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
-      "Server: ESP8266\n"
-      "Content-Type: text/plain;charset=utf-8\n"
-      "Connnection: close\n\n";*/
-      //uint8_t *msg=(uint8_t*)malloc(2048);
-      //*msg = '\0';
-      //uint8_t msg[2048] = {0};
+      char received[32] = {0};
       int reslen = 91;
-      if (len>127) {
-        len=127;
-      }
       char c ;
       int ii=0;
-      /*while(client->getUart()->available() && ii<len) {
-        c = client->getUart()->read();
-        received[ii++]=c;
-      }*/
       while (len) {
-          if ((client->getUart()->available()) && (ii<128)) {
+          if ((client->getUart()->available()) && (ii<32)) {
               c = client->getUart()->read();
               Serial.print(c);
-              len--;
+              //len--;
               received[ii++]=c;
           }
+          len--;
       }
       received[ii]='\0';
       Serial.println(received);
       
       if (strncmp(received, "GET ", 4) == 0) {
-        Serial.println("OKKKKK1");
-        /*const char *ptr = NULL;
-        if ((ptr = strchr(received+4, ' ')) == NULL) {
-          Serial.println("KKKOOOO");
-            //perror("GET too long!");
-        }
-        int index = ptr-&(received[4]);
-        strncpy(command,received+4,index);
-        //command[index]=0;
-        Serial.println(command);*/
         if (strncmp(received+4,"/arm",4) == 0) {
-            Serial.println("OKKKKK2");
             arm();
-            sprintf(msg+91,"Armed\n");
+            msg[91] = '\0';
+            strcat(msg+91,"Armed\n");
             reslen=97;
         } else if (strncmp(received+4,"/unarm",6) == 0) {
             unarm();
-            sprintf(msg+91,"Unarmed\n");
+            msg[91] = '\0';
+            strcat(msg+91,"Unarmed\n");
             reslen=99;
         } else if (strncmp(received+4,"/resetalarm",7) == 0) {
             resetAlarm();
-            sprintf(msg+91,"Alarm reset\n");
+            msg[91] = '\0';
+            strcat(msg+91,"Alarm reset\n");
             reslen=103;
+        } else if (strncmp(received+4,"/sync",4) == 0) {
+            sync();
+            msg[91] = '\0';
+            strcat(msg+91,"Synced\n");
+            reslen=98;
         } else if (strncmp(received+4,"/help",5) == 0) {
             msg[91] = '\0';
             strcat(msg+91,"arm\nunarm\nresetalarm\nallIntEnabled\nallIntDisabled\n");
@@ -666,7 +592,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
             strcat(msg+91,"All external disabled\n");
             reslen=113;
         } else if (strncmp(received+4,"/printEnabled",13) == 0) {
-            reslen=printAllEnabled(&msg);
+            reslen=printAllEnabled();
         } else if (strncmp(received+4,"/intEnable?id=",14) == 0) {
             int id = atoi(&received[18]);
             if ((id >=0) && (id < SENSOR_NUM)) {
@@ -674,7 +600,8 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+91,"Int.Gate %2d enabled\n",id);
               reslen=111;
             } else {
-              sprintf(msg+91,"ERROR: Unvalid id\n");
+              msg[91] = '\0';
+              strcat(msg+91,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else if (strncmp(received+4,"/intDisable?id=",15) == 0) {
@@ -684,7 +611,8 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+91,"Int.Gate %2d disabled\n",id);
               reslen=112;
             } else {
-              sprintf(msg+91,"ERROR: Unvalid id\n");
+              msg[91] = '\0';
+              strcat(msg+91,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else if (strncmp(received+4,"/extEnable?id=",14) == 0) {
@@ -694,7 +622,8 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+91,"Ext.Gate %2d enabled\n",id);
               reslen=111;            
             } else {
-              sprintf(msg+91,"ERROR: Unvalid id\n");
+              msg[91] = '\0';
+              strcat(msg+91,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else if (strncmp(received+4,"/extDisable?id=",15) == 0) {
@@ -704,34 +633,17 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+91,"Ext.Gate %2d disabled\n",id);
               reslen=112;
             } else {
-              sprintf(msg+91,"ERROR: Unvalid id\n");
+              msg[91] = '\0';
+              strcat(msg+91,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else {
           printToJSON();
-          //Serial.println(msg);
           reslen=117*SENSOR_NUM+144;
-            /*char *json=printToJSON();
-            sprintf(msg+91,"%s",json);
-            free(json);
-            strcat(msg,"{\"Sensor\": [\n");
-            int offset=13;
-            for (int idd=0; idd<SENSOR_NUM; idd++) {
-              char *line=printLineToJSON(idd);
-              strcat(msg,line);
-              offset+=sizeof(line);
-              free(line);
-            }
-            char tmp[40] = "";
-            sprintf(tmp,"],\n\"Started at\":\"%s\"\n}",startedAt);
-            strcat(msg,tmp);
-            strcat(hmsg,msg);
-            reslen=91;//+offset+40;*/
         }
       }
       
       client->send(mux_id, msg, reslen);
-      //msg[0] ='\0';
       if (client->releaseTCP(mux_id)) {
         BLYNK_LOG1(BLYNK_F("release tcp ok"));
       } else {
@@ -739,41 +651,6 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       }
       return;
 }
-
-/*char *printLineToJSON(int sid) {
-  char *line=(char*)malloc(128);
-  char temp[6];
-  char vcc[5];
-  dtostrf(sensorData[sid].temp,5, 2, temp);
-  dtostrf(sensorData[sid].vcc,4, 2, vcc);
-  snprintf(line,128,"\t{\"Id\":\"%2d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Battery V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
-  if (sid == SENSOR_NUM-1 ) {
-    strcat(line,"\"}\n");
-  } else {
-    strcat(line,"\"},\n");
-  }
-  return line;
-}
-
-char *printToJSON() {
-  //char json[2048] = {0};
-  //char line[128];
-  char *json = (char*)malloc(2048);
-  *json = '\0';
-  strcat(json,"{\"Sensor\": [\n");
-  for (int id=0; id<SENSOR_NUM; id++) {
-    //strcat(json,printLineToJSON(id));
-    char *line=printLineToJSON(id);
-    strcat(json,line);
-    free(line);
-    //printf("%s",line);
-  }
-  strcat(json,"],\n\"Started at:\":\"");
-  strcat(json,startedAt);
-  strcat(json,"\"\n}\n");
-  //printf(json);
-  return json;
-}*/
 
 void printLineToJSON(int sid) {
   jsonline[0] = '\0';
@@ -802,4 +679,15 @@ void printToJSON() {
   strcat(msg+91,startedAt);
   strcat(msg+91,"\"\n}\n");
 }
+
+int printAllEnabled() {
+  msg[91] = '\0';
+  char line[6] = {0};
+  for (int id=0; id<SENSOR_NUM*2; id++) {
+    sprintf(line,"%2d\t%u\n",id,EEPROM.read(id)==0?0:1);
+    strcat(msg+91,line);
+  }
+  return 91+(5*SENSOR_NUM*2);
+}
+
 
