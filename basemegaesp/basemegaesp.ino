@@ -297,8 +297,10 @@ void pushButtonLow() {
           displayOn = !displayOn;
           if (displayOn) {
             lcd.backlight();
+            Blynk.virtualWrite(V9, 1);
           } else {
             lcd.noBacklight();
+            Blynk.virtualWrite(V9, 0);
           }
         }
       } else {
@@ -554,48 +556,48 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
         if (strncmp(received+4,"/arm",4) == 0) {
             arm();
             msg[91] = '\0';
-            strcat(msg+91,"Armed\n");
+            strcat(msg,"Armed\n");
             reslen=97;
         } else if (strncmp(received+4,"/unarm",6) == 0) {
             unarm();
             msg[91] = '\0';
-            strcat(msg+91,"Unarmed\n");
+            strcat(msg,"Unarmed\n");
             reslen=99;
         } else if (strncmp(received+4,"/resetalarm",7) == 0) {
             resetAlarm();
             msg[91] = '\0';
-            strcat(msg+91,"Alarm reset\n");
+            strcat(msg,"Alarm reset\n");
             reslen=103;
         } else if (strncmp(received+4,"/sync",4) == 0) {
             sync();
             msg[91] = '\0';
-            strcat(msg+91,"Synced\n");
+            strcat(msg,"Synced\n");
             reslen=98;
         } else if (strncmp(received+4,"/help",5) == 0) {
             msg[91] = '\0';
-            strcat(msg+91,"arm\nunarm\nresetalarm\nallIntEnabled\nallIntDisabled\n");
-            strcat(msg+91,"allExtEnabled\nallExtDisabled\nprintEnabled\nintEnable?id=\n");
-            strcat(msg+91,"intDisable?id=\nextEnable?id=\nextDisable?id=\nsync\n");
+            strcat(msg,"arm\nunarm\nresetalarm\nallIntEnabled\nallIntDisabled\n");
+            strcat(msg,"allExtEnabled\nallExtDisabled\nprintEnabled\nintEnable?id=\n");
+            strcat(msg,"intDisable?id=\nextEnable?id=\nextDisable?id=\nsync\n");
             reslen=246;
         } else if (strncmp(received+4,"/allIntEnabled",14) == 0) {
             setAllIntEnabled();
             msg[91] = '\0';
-            strcat(msg+91,"All internal enabled\n");
+            strcat(msg,"All internal enabled\n");
             reslen=112;
         } else if (strncmp(received+4,"/allIntDisabled",15) == 0) {
             setAllIntDisabled();
             msg[91] = '\0';
-            strcat(msg+91,"All internal disabled\n");
+            strcat(msg,"All internal disabled\n");
             reslen=113;
         } else if (strncmp(received+4,"/allExtEnabled",14) == 0) {
             setAllExtEnabled();
             msg[91] = '\0';
-            strcat(msg+91,"All external enabled\n");
+            strcat(msg,"All external enabled\n");
             reslen=112;
         } else if (strncmp(received+4,"/allExtDisabled",15) == 0) {
             setAllExtDisabled();
             msg[91] = '\0';
-            strcat(msg+91,"All external disabled\n");
+            strcat(msg,"All external disabled\n");
             reslen=113;
         } else if (strncmp(received+4,"/printEnabled",13) == 0) {
             reslen=printAllEnabled();
@@ -607,7 +609,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               reslen=111;
             } else {
               msg[91] = '\0';
-              strcat(msg+91,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else if (strncmp(received+4,"/intDisable?id=",15) == 0) {
@@ -618,7 +620,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               reslen=112;
             } else {
               msg[91] = '\0';
-              strcat(msg+91,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else if (strncmp(received+4,"/extEnable?id=",14) == 0) {
@@ -629,7 +631,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               reslen=111;            
             } else {
               msg[91] = '\0';
-              strcat(msg+91,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else if (strncmp(received+4,"/extDisable?id=",15) == 0) {
@@ -640,12 +642,12 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               reslen=112;
             } else {
               msg[91] = '\0';
-              strcat(msg+91,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR: Unvalid id\n");
               reslen=109;
             }
         } else {
           printToJSON();
-          reslen=117*SENSOR_NUM+144;
+          reslen=117*SENSOR_NUM+143;
         }
       }
       
@@ -674,16 +676,16 @@ void printLineToJSON(int sid) {
 
 void printToJSON() {
   msg[91] = '\0';
-  strcat(msg+91,"{\"Sensor\": [\n");
+  strcat(msg,"{\"Sensor\": [\n");
   for (int id=0; id<SENSOR_NUM; id++) {
     //strcat(json,printLineToJSON(id));
     printLineToJSON(id);
-    strcat(msg+91,jsonline);
+    strcat(msg,jsonline);
     //printf("%s",line);
   }
-  strcat(msg+91,"],\n\"Started at:\":\"");
-  strcat(msg+91,startedAt);
-  strcat(msg+91,"\"\n}\n");
+  strcat(msg,"],\n\"Started at\":\"");
+  strcat(msg,startedAt);
+  strcat(msg,"\"\n}\n");
 }
 
 int printAllEnabled() {
@@ -691,7 +693,7 @@ int printAllEnabled() {
   char line[6] = {0};
   for (int id=0; id<SENSOR_NUM*2; id++) {
     sprintf(line,"%2d\t%u\n",id,EEPROM.read(id)==0?0:1);
-    strcat(msg+91,line);
+    strcat(msg,line);
   }
   return 91+(5*SENSOR_NUM*2);
 }
