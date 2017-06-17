@@ -70,7 +70,8 @@ char startedAt[20] = "";
 char tmpid[2] = "";
 char jsonline[128] ={0};
 tmElements_t tm;
-uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
+//uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
+char msg[2048] = "HTTP/1.1 200 OK\n"
 "Server: ESP8266\n"
 "Content-Type: text/plain;charset=utf-8\n"
 "Connnection: close\n\n";
@@ -540,7 +541,6 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       BLYNK_LOG1(BLYNK_F("Arriva!"));
       Serial.print("LEN: ");
       Serial.println(len);
-      boolean currentLineIsBlank = true;
       char received[32] = {0};
       int reslen = 91;
       char c ;
@@ -656,7 +656,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
         }
       }
       
-      client->send(mux_id, msg, reslen);
+      client->send(mux_id, (const uint8_t*)msg, reslen);
       if (client->releaseTCP(mux_id)) {
         BLYNK_LOG1(BLYNK_F("release tcp ok"));
       } else {
