@@ -345,8 +345,19 @@ void resetAlarm() {
 }
 
 void copySensorData(int sid) {
-  //DateTime now = rtc.now();
   RTC.read(tm);
+  if ((tempData.temp < 0) || (tempData.temp > 100)) {
+    tempData.temp=0.0;
+  }
+  if ((tempData.vcc < 0) || (tempData.vcc > 10)) {
+    tempData.vcc=0.0;
+  }
+  if (tempData.intDoor != 0) {
+    tempData.intDoor=1;
+  }
+  if (tempData.extDoor != 0) {
+    tempData.extDoor=1;
+  }
   sensorData[sid].temp = tempData.temp;
   sensorData[sid].intDoor = tempData.intDoor;
   sensorData[sid].extDoor = tempData.extDoor;
@@ -366,12 +377,6 @@ void printToSerial(char *line, char time[20]) {
 char *lcdLine(int sid) {
     char temp[6];
     char vcc[5];
-    if (sensorData[sid].temp < 0) {
-      sensorData[sid].temp=-sensorData[sid].temp;
-    }
-    if (sensorData[sid].vcc < 0) {
-      sensorData[sid].vcc=-sensorData[sid].vcc;
-    }
     dtostrf(sensorData[sid].temp,5, 2, temp);
     dtostrf(sensorData[sid].vcc,4, 2, vcc);
     sprintf(lcdl,"Id:%2d Temp:%5.5sIn:%1d Ex:%1d V:%4.4s",sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc);
