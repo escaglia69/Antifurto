@@ -82,6 +82,7 @@ char msg[2048] = "HTTP/1.1 200 OK\n"
 
 ESP8266 wifi(&EspSerial);
 BlynkTimer timer;
+BlynkTimer ttimer;
 
 void setup(void){
   Serial.begin(115200);
@@ -134,10 +135,11 @@ void setup(void){
 
   if (Blynk.connected()) {
     Serial.println(F("Rete in setup"));
-    Blynk.virtualWrite(V9, 0);
+    //Blynk.virtualWrite(V9, 0);
     brtc.begin();
   }
   timer.setInterval(60000L, CheckConnection);
+  ttimer.setInterval(301000L, SendTemp);
  
   if (wifi.startTCPServer(8080)) {
       Serial.print("start tcp server ok\r\n");
@@ -159,6 +161,17 @@ void CheckConnection(){
     Serial.println(F("Not connected"));
     Blynk.reconnect(ssid, pass);
   }
+}
+
+void SendTemp() {
+  Blynk.virtualWrite(V10, sensorData[1].temp);
+  Blynk.virtualWrite(V11, sensorData[3].temp);
+  Blynk.virtualWrite(V12, sensorData[4].temp);
+  Blynk.virtualWrite(V13, sensorData[6].temp);
+  Blynk.virtualWrite(V14, sensorData[7].temp);
+  Blynk.virtualWrite(V15, sensorData[8].temp);
+  Blynk.virtualWrite(V16, sensorData[10].temp);
+  Blynk.virtualWrite(V17, sensorData[11].temp);
 }
 
 void sync() {
@@ -217,6 +230,7 @@ void loop() {
   timer.run();
   if(Blynk.connected()){
     Blynk.run();
+    ttimer.run();
   }
 }
 
@@ -548,9 +562,10 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       while (len) {
           if ((client->getUart()->available()) && (ii<32)) {
               c = client->getUart()->read();
-              Serial.print(c);
-              //len--;
-              received[ii++]=c;
+              if (ii<31) {
+                received[ii++]=c;                
+              }
+              //Serial.print(c);
           }
           len--;
       }
