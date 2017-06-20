@@ -135,8 +135,7 @@ void setup(void){
 
   if (Blynk.connected()) {
     Serial.println(F("Rete in setup"));
-    //Blynk.virtualWrite(V9, 0);
-    brtc.begin();
+    Blynk.virtualWrite(V9, 0);
   }
   timer.setInterval(60000L, CheckConnection);
   ttimer.setInterval(301000L, SendTemp);
@@ -175,13 +174,35 @@ void SendTemp() {
 }
 
 void sync() {
+  brtc.begin();
   tm.Year = CalendarYrToTm(year());
   tm.Month = month();
   tm.Day = day();
   tm.Hour = hour();
   tm.Minute = minute();
   tm.Second = second();
-  RTC.write(tm);  
+  if (RTC.write(tm)) {
+      Serial.println("RTC updated!");
+    }
+}
+
+void clockDisplay()
+{
+  // You can call hour(), minute(), ... at any time
+  // Please see Time library examples for details
+
+  String currentTime = String(hour()) + ":" + minute() + ":" + second();
+  String currentDate = String(day()) + " " + month() + " " + year();
+  Serial.print("Current time: ");
+  Serial.print(currentTime);
+  Serial.print(" ");
+  Serial.print(currentDate);
+  Serial.println();
+
+  // Send time to the App
+  Blynk.virtualWrite(V1, currentTime);
+  // Send date to the App
+  Blynk.virtualWrite(V2, currentDate);
 }
 
 void loop() {
@@ -512,6 +533,7 @@ BLYNK_WRITE(V4) {
 
 BLYNK_WRITE(V7) {
   if (param.asInt()) {
+    clockDisplay();
     sync();
   }
 }
@@ -530,25 +552,6 @@ BLYNK_WRITE(V9) {
   } else {
     lcd.noBacklight();
   }
-}
-
-void clockDisplay()
-{
-  // You can call hour(), minute(), ... at any time
-  // Please see Time library examples for details
-
-  String currentTime = String(hour()) + ":" + minute() + ":" + second();
-  String currentDate = String(day()) + " " + month() + " " + year();
-  /*Serial.print("Current time: ");
-  Serial.print(currentTime);
-  Serial.print(" ");
-  Serial.print(currentDate);
-  Serial.println();*/
-
-  // Send time to the App
-  Blynk.virtualWrite(V1, currentTime);
-  // Send date to the App
-  Blynk.virtualWrite(V2, currentDate);
 }
 
 void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
