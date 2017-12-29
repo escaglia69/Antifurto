@@ -161,10 +161,10 @@ public:
             BLYNK_LOG1(BLYNK_F("Failed to connect WiFi"));
             return false;
         }
-        if (!wifi->setStationIp("192.168.178.73","192.168.178.1","255.255.255.0",3)) {
+        /*if (!wifi->setStationIp("192.168.178.73","192.168.178.1","255.255.255.0",3)) {
             BLYNK_LOG1(BLYNK_F("Failed to set IP"));
             return false;
-        }
+        }*/
         BLYNK_LOG1(BLYNK_F("Connected to WiFi"));
         return true;
     }

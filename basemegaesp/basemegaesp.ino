@@ -31,7 +31,8 @@ sensorDataRecord tempData;
 int sid;
 int sidOnDisplay = SENSOR_NUM - 1;
 
-LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+//LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
 
 const int highButtonPin = A3;
 const int lowButtonPin = A2;
@@ -55,7 +56,7 @@ long highButtonTimer = 0;
 boolean highButtonActive = false;
 boolean highLongPressActive = false;
 
-byte mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0x5A, 0x82 };
+//byte mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0x5A, 0x82 };
 /*IPAddress manualIP(192,168,178,50);
 IPAddress gateway(192,168,178,1);
 IPAddress subnet(255, 255, 255, 0);
