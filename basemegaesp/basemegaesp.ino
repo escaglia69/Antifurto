@@ -8,6 +8,7 @@
 #include <TimeLib.h>
 #include <WidgetRTC.h>
 #include <RCSwitch.h>
+#include "Oregon.h"
 #include "secret.h"
 
 bool isFirstConnect = true;
@@ -87,6 +88,9 @@ char suffixup[9] = "10010001";
 char suffixdown[9] = "10010100";
 char code[25] = {0};
 bool firstsync = true;
+byte westcount = 0;
+byte northcount = 0;
+byte southcount = 0;
 
 
 #define EspSerial Serial3
@@ -96,8 +100,10 @@ ESP8266 wifi(&EspSerial);
 BlynkTimer timer;
 BlynkTimer ttimer;
 RCSwitch mySwitch = RCSwitch();
-//OregonDecoderV2 orscV2;
-//volatile word pulse;
+#define TRX_PIN  12
+#define VOLTAGE_THRESH 4.0
+THN132N sender1(TRX_PIN, 0xAA, 0x10);
+THN132N sender2(TRX_PIN, 0xCC, 0x20);
 
 void setup(void){
   Serial.begin(115200);
@@ -274,19 +280,21 @@ void loop() {
       /*Serial.print(tempData.sid);
       Serial.print(" ");
       Serial.println(tempData.temp);*/
-      if(tempData.sid==92) {
+      if(tempData.sid==91) {
+        sender2.send(tempData.temp,tempData.vcc > VOLTAGE_THRESH);
         tempN=tempData.temp;
         Serial.print(F("TEMP NORD: "));
         Serial.println(tempN);
         tempLine(tempData.sid,'N');
       }
-      if(tempData.sid==91) {
+      if(tempData.sid==92) {
         tempS=tempData.temp;
         Serial.print(F("TEMP SUD: "));
         Serial.println(tempS);
         tempLine(tempData.sid,'S');
       }
       if(tempData.sid==90) {
+        sender1.send(tempData.temp,tempData.vcc > VOLTAGE_THRESH);
         tempO=tempData.temp;
         Serial.print(F("TEMP OVEST: "));
         Serial.println(tempO);
@@ -755,7 +763,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
           msg[reslen-39]='\0';
           strcat(msg,"Content-Type: application/json\n\n");
           printToJSON();
-          reslen=117*SENSOR_NUM+52+reslen-8+36;
+          reslen=117*SENSOR_NUM+52+reslen-8+54;
         }
       }
       
@@ -797,6 +805,9 @@ void printToJSON() {
   strcat(msg,temp);
   dtostrf(tempS,5, 2, temp);
   strcat(msg,"\",\n\"Temp S\":\"");
+  strcat(msg,temp);
+  dtostrf(tempO,5, 2, temp);
+  strcat(msg,"\",\n\"Temp O\":\"");
   strcat(msg,temp);
   strcat(msg,"\",\n\"Started at\":\"");
   strcat(msg,startedAt);
