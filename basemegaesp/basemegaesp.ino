@@ -78,6 +78,8 @@ tmElements_t tm;
 //uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
 char msg[2048] = "HTTP/1.1 200 OK\n"
 "Server: ESP8266\n"
+"Access-Control-Allow-Origin: *\n"
+"Access-Control-Allow-Headers: Content-Type\n"
 "Connection: close\n\0";
 char received[32] = {0};
 char prefix[9] = "01000101";
@@ -648,7 +650,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       Serial.print(F("LEN: "));
       Serial.println(len);
       //char received[32] = {0};
-      int reslen = 51;
+      int reslen = 125;
       msg[reslen] = '\0';
       char c ;
       int ii=0;
@@ -666,7 +668,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       
       if (strncmp(received, "GET ", 4) == 0) {
         strcat(msg,"Content-Type: text/plain;charset=utf-8\n\n");
-        reslen=90;
+        reslen=164;
         if (strncmp(received+4,"/arm",4) == 0) {
             arm();
             strcat(msg,"Armed\n");
@@ -773,7 +775,7 @@ void printLineToJSON(int sid) {
   char vcc[5];
   dtostrf(sensorData[sid].temp,5, 2, temp);
   dtostrf(sensorData[sid].vcc,4, 2, vcc);
-  snprintf(jsonline,128,"\t{\"Id\":\"%2d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Battery V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
+  snprintf(jsonline,128,"\t{\"Id\":\"%02d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Battery V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
   if (sid == SENSOR_NUM-1 ) {
     strcat(jsonline,"\"}\n");
   } else {
