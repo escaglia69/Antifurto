@@ -1,6 +1,5 @@
 #define BLYNK_PRINT Serial
 #include "RF24.h"
-#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <EEPROM.h>
 #include <ESP8266_Lib.h>
@@ -8,6 +7,7 @@
 #include <DS1307RTC.h>
 #include <TimeLib.h>
 #include <WidgetRTC.h>
+#include <RCSwitch.h>
 #include "secret.h"
 
 bool isFirstConnect = true;
@@ -31,9 +31,10 @@ sensorDataRecord tempData;
 int sid;
 int sidOnDisplay = SENSOR_NUM - 1;
 
-//LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
-LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+//LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
 
+const int rftxdatapin = 12;
 const int highButtonPin = A3;
 const int lowButtonPin = A2;
 const int greenLedPin = A1;
@@ -67,7 +68,10 @@ boolean alarm = false;
 boolean alarmSent = false;
 char lcdl[33];
 bool Connected2Blynk = false;
-char startedAt[20] = "";
+char startedAt[20] = "01/01/2016 00:00:00";
+float tempN;
+float tempS;
+float tempO;
 char tmpid[2] = "";
 char jsonline[128] ={0};
 tmElements_t tm;
@@ -76,6 +80,11 @@ char msg[2048] = "HTTP/1.1 200 OK\n"
 "Server: ESP8266\n"
 "Connection: close\n\0";
 char received[32] = {0};
+char prefix[9] = "01000101";
+char suffixup[9] = "10010001";
+char suffixdown[9] = "10010100";
+char code[25] = {0};
+bool firstsync = true;
 
 
 #define EspSerial Serial3
@@ -84,10 +93,13 @@ char received[32] = {0};
 ESP8266 wifi(&EspSerial);
 BlynkTimer timer;
 BlynkTimer ttimer;
+RCSwitch mySwitch = RCSwitch();
+//OregonDecoderV2 orscV2;
+//volatile word pulse;
 
 void setup(void){
   Serial.begin(115200);
-  Serial.println("Setup!");
+  Serial.println(F("Setup!"));
   lcd.begin(16,2);   // initialize the lcd for 16 chars 2 lines, turn on backlight
   lcd.noBacklight(); // finish with backlight on
   lcd.setCursor(0,0); //Start at character 4 on line 0
@@ -96,13 +108,13 @@ void setup(void){
   lcd.print(F("Avviato!"));
   if (RTC.read(tm)) {
     sprintf(startedAt, "%02d/%02d/%04d %02d:%02d:%02d", tm.Day, tm.Month, tmYearToCalendar(tm.Year), tm.Hour, tm.Minute, tm.Second);
-    Serial.print("Started at: ");
+    Serial.print(F("Started at: "));
     Serial.println(startedAt);    
   } else {
     if (RTC.chipPresent()) {
-      Serial.println("The DS1307 is stopped.  Please run the SetTime");
+      Serial.println(F("The DS1307 is stopped.  Please run the SetTime"));
     } else {
-      Serial.println("DS1307 read error!  Please check the circuitry.");
+      Serial.println(F("DS1307 read error!  Please check the circuitry."));
       Serial.println();
     }
     delay(100);
@@ -118,15 +130,21 @@ void setup(void){
   // set initial LED state
   digitalWrite(greenLedPin, greenLedState);
   digitalWrite(yellowLedPin, yellowLedState);
+  
+  mySwitch.enableTransmit(rftxdatapin);
+  mySwitch.setPulseLength(399);
 
   radio.begin();
-
+  //radio.setChannel(70); //************ATTENZIONE*****************
+  //radio.setPayloadSize(16);
+  
   // Min speed (for better range I presume)
   radio.setDataRate( RF24_250KBPS );
   // 8 bits CRC
   radio.setCRCLength( RF24_CRC_8 );
   // increase the delay between retries & # of retries
   radio.setRetries(15,15);
+  //radio.setChannel(72);
   radio.openReadingPipe(1,saddr[0]);
   radio.startListening();
 
@@ -142,20 +160,25 @@ void setup(void){
   ttimer.setInterval(301000L, SendTemp);
  
   if (wifi.startTCPServer(8080)) {
-      Serial.print("start tcp server ok\r\n");
+      Serial.print(F("start tcp server ok\r\n"));
   } else {
-      Serial.print("start tcp server err\r\n");
+      Serial.print(F("start tcp server err\r\n"));
   }
   
-  if (wifi.setTCPServerTimeout(4)) { 
-      Serial.print("set tcp server timout 2 seconds\r\n");
+  if (wifi.setTCPServerTimeout(6)) { 
+      Serial.print(F("set tcp server timout 6 seconds\r\n"));
   } else {
-      Serial.print("set tcp server timout err\r\n");
+      Serial.print(F("set tcp server timout err\r\n"));
   }
 
 }
 
 void CheckConnection(){
+  if (firstsync) {
+    firstsync = false;
+    sync();
+    sprintf(startedAt, "%02d/%02d/%04d %02d:%02d:%02d", tm.Day, tm.Month, tmYearToCalendar(tm.Year), tm.Hour, tm.Minute-1, tm.Second);      
+  }
   Connected2Blynk = Blynk.connected();
   if(!Connected2Blynk){
     Serial.println(F("Not connected"));
@@ -175,16 +198,19 @@ void SendTemp() {
 }
 
 void sync() {
-  brtc.begin();
-  tm.Year = CalendarYrToTm(year());
-  tm.Month = month();
-  tm.Day = day();
-  tm.Hour = hour();
-  tm.Minute = minute();
-  tm.Second = second();
-  if (RTC.write(tm)) {
-      Serial.println("RTC updated!");
-    }
+  //brtc.begin();
+  clockDisplay();
+  if (year()!=1970) {
+    tm.Year = CalendarYrToTm(year());
+    tm.Month = month();
+    tm.Day = day();
+    tm.Hour = hour();
+    tm.Minute = minute();
+    tm.Second = second();
+    if (RTC.write(tm)) {
+      Serial.println(F("RTC updated!"));
+    } 
+  }
 }
 
 void clockDisplay()
@@ -194,16 +220,16 @@ void clockDisplay()
 
   String currentTime = String(hour()) + ":" + minute() + ":" + second();
   String currentDate = String(day()) + " " + month() + " " + year();
-  Serial.print("Current time: ");
+  Serial.print(F("Current time: "));
   Serial.print(currentTime);
-  Serial.print(" ");
+  Serial.print(F(" "));
   Serial.print(currentDate);
   Serial.println();
 
   // Send time to the App
-  Blynk.virtualWrite(V1, currentTime);
+  //Blynk.virtualWrite(V1, currentTime);
   // Send date to the App
-  Blynk.virtualWrite(V2, currentDate);
+  //Blynk.virtualWrite(V2, currentDate);
 }
 
 void loop() {
@@ -242,13 +268,50 @@ void loop() {
       printToSerial(lcdl,sensorData[sid].dateTime);
       printOnLCD(lcdl);
       printOnWLCD(lcdl);
+    } else if((tempData.sid<100) && (tempData.sid>=90)) {
+      /*Serial.print(tempData.sid);
+      Serial.print(" ");
+      Serial.println(tempData.temp);*/
+      if(tempData.sid==92) {
+        tempN=tempData.temp;
+        Serial.print(F("TEMP NORD: "));
+        Serial.println(tempN);
+        tempLine(tempData.sid,'N');
+      }
+      if(tempData.sid==91) {
+        tempS=tempData.temp;
+        Serial.print(F("TEMP SUD: "));
+        Serial.println(tempS);
+        tempLine(tempData.sid,'S');
+      }
+      if(tempData.sid==90) {
+        tempO=tempData.temp;
+        Serial.print(F("TEMP OVEST: "));
+        Serial.println(tempO);
+        tempLine(tempData.sid,'O');
+      }
+      printToSerial(lcdl,tempData.dateTime);
+      printOnLCD(lcdl);
+      printOnWLCD(lcdl);
     } else {
-      Serial.print("####SID: %2d out of range!#### ");
+      Serial.print(F("####SID out of range!#### "));
       Serial.println(tempData.sid);
       //printf("####SID: %2d out of range!####\n",tempData.sid);
     }
   }
 
+  /*cli();
+  word p = pulse;
+  pulse = 0;
+  sei();
+  if (p != 0) {
+    //Serial.print("[pulse]");
+    //Serial.print(p, HEX);
+    //Serial.println();
+    if (orscV2.nextPulse(p))
+      reportSerial("OSV2", orscV2);       
+  }*/
+    
   timer.run();
   if(Blynk.connected()){
     Blynk.run();
@@ -407,7 +470,7 @@ void copySensorData(int sid) {
 
 void printToSerial(char *line, char time[20]) {
   Serial.print(line);
-  Serial.print(" ");
+  Serial.print(F(" "));
   Serial.println(time);
   Serial.println(freeRam());
 }
@@ -420,6 +483,16 @@ char *lcdLine(int sid) {
     sprintf(lcdl,"Id:%2d Temp:%5.5sIn:%1d Ex:%1d V:%4.4s",sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc);
     return lcdl;
 }
+
+char *tempLine(int sid, char cp) {
+    char temp[6];
+    char vcc[5];
+    dtostrf(tempData.temp,5, 2, temp);
+    dtostrf(tempData.vcc,4, 2, vcc);
+    sprintf(lcdl,"Temp Est %c:%5.5s          V:%4.4s",cp,temp,vcc);
+    return lcdl;
+}
+
 void printOnLCD(char *line) {
   if (!alarm) {
     lcd.clear();
@@ -480,10 +553,12 @@ void setAllExtDisabled() {
 
 BLYNK_CONNECTED() // runs every time Blynk connection is established
 {
-    //if (isFirstConnect) 
+    if (isFirstConnect) 
     {
       // Request server to re-send latest values for all pins
-      Blynk.syncAll();
+      //Blynk.syncAll();
+      //Blynk.SyncVirtual(V0, V1,...);
+      brtc.begin();
       isFirstConnect = false;
     }
     wlcd.clear();
@@ -556,9 +631,21 @@ BLYNK_WRITE(V9) {
   }
 }
 
+BLYNK_WRITE(V18) {
+  if (param.asInt()) {
+    openShutter(sidOnDisplay);
+  }
+}
+
+BLYNK_WRITE(V19) {
+  if (param.asInt()) {
+    closeShutter(sidOnDisplay);
+  }
+}
+
 void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       BLYNK_LOG1(BLYNK_F("Arriva!"));
-      Serial.print("LEN: ");
+      Serial.print(F("LEN: "));
       Serial.println(len);
       //char received[32] = {0};
       int reslen = 51;
@@ -588,19 +675,22 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
             unarm();
             strcat(msg,"Unarmed\n");
             reslen+=8;
-        } else if (strncmp(received+4,"/resetalarm",7) == 0) {
+        } else if (strncmp(received+4,"/alarmreset",11) == 0) {
             resetAlarm();
             strcat(msg,"Alarm reset\n");
             reslen+=12;
-        } else if (strncmp(received+4,"/sync",4) == 0) {
+        } else if (strncmp(received+4,"/sync",5) == 0) {
             sync();
             strcat(msg,"Synced\n");
             reslen+=7;
+        } else if (strncmp(received+4,"/reset",6) == 0) {
+            Blynk.restart();
+            softReset();
         } else if (strncmp(received+4,"/help",5) == 0) {
-            strcat(msg,"arm\nunarm\nresetalarm\nallIntEnabled\nallIntDisabled\n");
+            strcat(msg,"arm\nunarm\nalarmreset\nallIntEnabled\nallIntDisabled\n");
             strcat(msg,"allExtEnabled\nallExtDisabled\nprintEnabled\nintEnable?id=\n");
-            strcat(msg,"intDisable?id=\nextEnable?id=\nextDisable?id=\nsync\n");
-            reslen+=155;
+            strcat(msg,"intDisable?id=\nextEnable?id=\nextDisable?id=\nsync\nreset\n");
+            reslen+=161;
         } else if (strncmp(received+4,"/allIntEnabled",14) == 0) {
             setAllIntEnabled();
             strcat(msg,"All internal enabled\n");
@@ -663,7 +753,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
           msg[reslen-39]='\0';
           strcat(msg,"Content-Type: application/json\n\n");
           printToJSON();
-          reslen=117*SENSOR_NUM+52+reslen-8;
+          reslen=117*SENSOR_NUM+52+reslen-8+36;
         }
       }
       
@@ -699,9 +789,20 @@ void printToJSON() {
     strcat(msg,jsonline);
     //printf("%s",line);
   }
-  strcat(msg,"],\n\"Started at\":\"");
+  char temp[6];
+  dtostrf(tempN,5, 2, temp);
+  strcat(msg,"],\n\"Temp N\":\"");
+  strcat(msg,temp);
+  dtostrf(tempS,5, 2, temp);
+  strcat(msg,"\",\n\"Temp S\":\"");
+  strcat(msg,temp);
+  strcat(msg,"\",\n\"Started at\":\"");
   strcat(msg,startedAt);
   strcat(msg,"\"\n}\n");
+  
+  /*strcat(msg,"],\n\"Started at\":\"");
+  strcat(msg,startedAt);
+  strcat(msg,"\"\n}\n");*/
 }
 
 int printAllEnabled(int len) {
@@ -717,6 +818,45 @@ int freeRam () {
    extern int __heap_start, *__brkval; 
    int v; 
    return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}
+
+void openShutter(int gate) {
+  Serial.println("APRI");
+  char sensorBin[9] = {0};
+  toBitsArray(gate, sensorBin);
+  code[0] = '\0';
+  strcat(code, prefix);
+  strcat(code, sensorBin);
+  strcat(code, suffixup);
+  mySwitch.send(code);
+  delay(10);
+}
+
+void closeShutter(int gate) {
+  Serial.println("CHIUDI");
+  char sensorBin[9] = {0};
+  toBitsArray(gate, sensorBin);
+  code[0] = '\0';
+  strcat(code, prefix);
+  strcat(code, sensorBin);
+  strcat(code, suffixdown);
+  mySwitch.send(code);
+  delay(10);
+}
+
+void toBitsArray(int val, char* ca) {
+  //byte ba[8];
+  //char ca[9] = {0};
+  //byte state;
+  for (int i=7; i>=0; i--) {
+    ca[7-i] = bitRead(val, i)?'1':'0';
+    Serial.print(ca[7-i]);
+  }
+  ca[8] = '\0';
+}
+
+void softReset(){
+  asm volatile ("  jmp 0");
 }
 
 

@@ -260,6 +260,12 @@ public:
       }
     }
 
+    void restart() {
+      if (!wifi->restart()) {
+        BLYNK_LOG1(BLYNK_F("Failed to restart"));
+      }
+    }
+
 private:
     ESP8266* wifi;
 };
