@@ -88,10 +88,6 @@ char suffixup[9] = "10010001";
 char suffixdown[9] = "10010100";
 char code[25] = {0};
 bool firstsync = true;
-byte westcount = 0;
-byte northcount = 0;
-byte southcount = 0;
-
 
 #define EspSerial Serial3
 #define ESP8266_BAUD 115200
@@ -102,8 +98,8 @@ BlynkTimer ttimer;
 RCSwitch mySwitch = RCSwitch();
 #define TRX_PIN  12
 #define VOLTAGE_THRESH 4.0
-THN132N sender1(TRX_PIN, 0xAA, 0x10);
-THN132N sender2(TRX_PIN, 0xCC, 0x20);
+THN132N sender1(TRX_PIN, 0xAA, 1);
+THN132N sender2(TRX_PIN, 0x20, 2);
 
 void setup(void){
   Serial.begin(115200);
@@ -138,7 +134,9 @@ void setup(void){
   // set initial LED state
   digitalWrite(greenLedPin, greenLedState);
   digitalWrite(yellowLedPin, yellowLedState);
-  
+  /*####################*/
+  //digitalWrite(13, LOW);
+  /*####################*/
   mySwitch.enableTransmit(rftxdatapin);
   mySwitch.setPulseLength(399);
 
@@ -276,13 +274,15 @@ void loop() {
       printToSerial(lcdl,sensorData[sid].dateTime);
       printOnLCD(lcdl);
       printOnWLCD(lcdl);
+      //sender2.send(tempN,true);
+      delay(10);
     } else if((tempData.sid<100) && (tempData.sid>=90)) {
       /*Serial.print(tempData.sid);
       Serial.print(" ");
       Serial.println(tempData.temp);*/
       if(tempData.sid==91) {
-        sender2.send(tempData.temp,tempData.vcc > VOLTAGE_THRESH);
         tempN=tempData.temp;
+        sender2.send(tempN,tempData.vcc > VOLTAGE_THRESH);
         Serial.print(F("TEMP NORD: "));
         Serial.println(tempN);
         tempLine(tempData.sid,'N');
@@ -294,8 +294,8 @@ void loop() {
         tempLine(tempData.sid,'S');
       }
       if(tempData.sid==90) {
-        sender1.send(tempData.temp,tempData.vcc > VOLTAGE_THRESH);
         tempO=tempData.temp;
+        sender1.send(tempO,tempData.vcc > VOLTAGE_THRESH);
         Serial.print(F("TEMP OVEST: "));
         Serial.println(tempO);
         tempLine(tempData.sid,'O');
@@ -650,6 +650,18 @@ BLYNK_WRITE(V18) {
 BLYNK_WRITE(V19) {
   if (param.asInt()) {
     closeShutter(sidOnDisplay);
+  }
+}
+
+BLYNK_WRITE(V20) {
+  if (param.asInt()) {
+    openShutter(param.asInt());
+  }
+}
+
+BLYNK_WRITE(V21) {
+  if (param.asInt()) {
+    closeShutter(param.asInt());
   }
 }
 

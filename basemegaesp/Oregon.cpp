@@ -24,7 +24,7 @@
 #include "Oregon.h"
 //#include <Debug.h>
  
-const unsigned long TIME = 512;
+const unsigned long TIME = 488;
 const unsigned long TWOTIME = TIME*2;
 
 /*********************************************
@@ -46,8 +46,8 @@ void Oregon::setId(byte id)
 
 void Oregon::setChannel(byte channel)
 {
-  /*if (channel > 3) channel = 3;
-  channel <<= 4;*/
+  if (channel > 3) channel = 3;
+  channel <<= 4;
   byte *data = getData();
   data[2] = channel;
 }
