@@ -7,6 +7,8 @@ Base can be of different kind, depending on the hardware you use.
 
 A standard base can be made with Arduino Mega or compatible boards (basemega), with memory big enough to have full features.
 
+![Schema](https://raw.githubusercontent.com/escaglia69/Antifurto/master/images/Antifurto.jpg)
+
 Prior to building base  you need to modify a file of the RF24 library to reflect the pinout of the board.
 The modification is as follows:
 
