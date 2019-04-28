@@ -1,6 +1,8 @@
 # Antifurto
 Anti intrusion system made with Arduino compatible boards.
 
+See more at the ![Wiki page](https://github.com/escaglia69/Antifurto/wiki)
+
 It is made of one or more sensors (sensore) and one base.
 
 Base can be of different kind, depending on the hardware you use.
