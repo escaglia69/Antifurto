@@ -98,8 +98,27 @@ BlynkTimer ttimer;
 RCSwitch mySwitch = RCSwitch();
 #define TRX_PIN  12
 #define VOLTAGE_THRESH 4.0
-THN132N sender1(TRX_PIN, 0xAA, 1);
-THN132N sender2(TRX_PIN, 0x20, 2);
+//THN132N sender1(TRX_PIN, 0xAA, 1);
+//THN132N sender2(TRX_PIN, 0x20, 2);
+
+String inputString        = "";         // a string to hold incoming data
+unsigned int modulation   = 0;          // PWM = 0, PPM = 1
+unsigned int repeats      = 6;          // signal repeats
+unsigned int bits         = 40;         // amount of bits in a packet
+unsigned int channel      = 3;          // remote channel
+unsigned int pd_len       = 1064;  //1088      // pulse/distance length (in us)
+unsigned int zero_len     = 700;   //716     // length of 0 (in us)
+unsigned int zero_len_left= pd_len-zero_len;        // length of 0 (in us)
+unsigned int one_len      = 345;   //360    // length of 1 (in us)
+unsigned int one_len_left = pd_len-one_len;        // length of 0 (in us)
+unsigned int pause_len    = 7500;  //7500    // pause length (in us), time between packets
+unsigned int preamble     = 0;       // preamble length (in us)
+unsigned int invert       = 0;          // invert the bits before transmit
+//char packet_buf[256]      = {0};        // packet payload buffer
+char packet_buf[256]      = {0};        // packet payload buffer
+unsigned int pbuf_len     = 0;          // payload buffer length
+unsigned int bit_pos      = 0;          // bit reader bit position
+unsigned int curtain      = 1;
 
 void setup(void){
   Serial.begin(115200);
@@ -274,7 +293,6 @@ void loop() {
       printToSerial(lcdl,sensorData[sid].dateTime);
       printOnLCD(lcdl);
       printOnWLCD(lcdl);
-      //sender2.send(tempN,true);
       delay(10);
     } else if((tempData.sid<100) && (tempData.sid>=90)) {
       /*Serial.print(tempData.sid);
@@ -282,7 +300,7 @@ void loop() {
       Serial.println(tempData.temp);*/
       if(tempData.sid==91) {
         tempN=tempData.temp;
-        sender2.send(tempN,tempData.vcc > VOLTAGE_THRESH);
+        //sender2.send(tempN,tempData.vcc > VOLTAGE_THRESH);
         Serial.print(F("TEMP NORD: "));
         Serial.println(tempN);
         tempLine(tempData.sid,'N');
@@ -295,10 +313,10 @@ void loop() {
       }
       if(tempData.sid==90) {
         tempO=tempData.temp;
-        sender1.send(tempO,tempData.vcc > VOLTAGE_THRESH);
-        Serial.print(F("TEMP OVEST: "));
+        //sender1.send(tempO,tempData.vcc > VOLTAGE_THRESH);
+        Serial.print(F("TEMP EST: "));
         Serial.println(tempO);
-        tempLine(tempData.sid,'O');
+        tempLine(tempData.sid,'E');
       }
       printToSerial(lcdl,tempData.dateTime);
       printOnLCD(lcdl);
@@ -568,6 +586,7 @@ BLYNK_CONNECTED() // runs every time Blynk connection is established
       // Request server to re-send latest values for all pins
       //Blynk.syncAll();
       //Blynk.SyncVirtual(V0, V1,...);
+      Blynk.syncVirtual(V22);
       brtc.begin();
       isFirstConnect = false;
     }
@@ -662,6 +681,23 @@ BLYNK_WRITE(V20) {
 BLYNK_WRITE(V21) {
   if (param.asInt()) {
     closeShutter(param.asInt());
+  }
+}
+
+BLYNK_WRITE(V22) {
+  if (param.asInt()) {
+    curtain=param.asInt();
+  }
+}
+BLYNK_WRITE(V23) {
+  if (param.asInt()) {
+    if (param.asInt()==1) {
+      curtain_command(1, curtain);
+    } else if (param.asInt()==2) {
+      curtain_command(0, curtain);
+    } else {
+      curtain_command(-1, curtain);
+    }
   }
 }
 
@@ -884,4 +920,105 @@ void softReset(){
   asm volatile ("  jmp 0");
 }
 
+char hextoInt(char hex_nibble) {
+  switch (hex_nibble) {
+    case '0': return 0;
+    case '1': return 1;
+    case '2': return 2;
+    case '3': return 3;
+    case '4': return 4;
+    case '5': return 5;
+    case '6': return 6;
+    case '7': return 7;
+    case '8': return 8;
+    case '9': return 9;
+    case 'A': return 0xA;
+    case 'B': return 0xB;
+    case 'C': return 0xC;
+    case 'D': return 0xD;
+    case 'E': return 0xE;
+    case 'F': return 0xF;
+    case 'a': return 0xA;
+    case 'b': return 0xB;
+    case 'c': return 0xC;
+    case 'd': return 0xD;
+    case 'e': return 0xE;
+    case 'f': return 0xF;
+    default: return 0;
+  }
+}
 
+// sprintf bugs made me do this, the object code is smaller without sprintf also
+char get_hex_char(char hchar){
+  if (hchar>9)
+    return hchar+'A'-10;
+  else
+    return hchar+'0';
+}
+
+int get_bit() {
+  int ret;
+  int byte_pos     = bit_pos / 8;
+  int byte_bit_pos = 7 - (bit_pos % 8);     // reverse indexing to send the bits msb
+  bit_pos++;
+  ret = (packet_buf[byte_pos] & (1<<byte_bit_pos)) ? 1 : 0;
+  return ret^invert;
+}
+
+int curtain_command(int command, int channel) {
+  int i,j;
+  int bit;
+  int pwm_bl;
+
+  // send preamble - not implemented
+  if (command>=1) { //up
+    inputString = "c2ce7230ee";
+  } else if (command<=-1) { //down
+    inputString = "c2ce7230cc";
+  } else {
+    inputString = "c2ce7230aa";
+  }
+  inputString[7]=get_hex_char(15-channel);
+  for (int i=0 ; i<inputString.length()-1 ; i++){
+    packet_buf[i]  = hextoInt((char)inputString[(i*2)]) << 4;
+    packet_buf[i] |= hextoInt((char)inputString[(i*2) + 1]);
+  }
+  // TODO clear the packet_buf buffer 
+  pbuf_len = ((inputString.length()-1)+1)/2;  //round up
+
+  // repeats
+  for (j=0; j<(2*repeats); j++) {
+    digitalWrite(TRX_PIN, HIGH);
+    delayMicroseconds(pd_len*4);
+    digitalWrite(TRX_PIN, LOW);
+    delayMicroseconds(pd_len*1);
+    // reset bit reader
+    bit_pos = 0;
+    //At the middle complements last nibble
+    if (j==repeats) {
+      if (command==0)
+        break;
+      packet_buf[4] &= 240;
+      packet_buf[4] |= (15-hextoInt((char)inputString[9]));
+    }
+    // send bits
+    for (i=0; i<bits; i++) {
+      bit = get_bit();
+      digitalWrite(TRX_PIN, HIGH);
+      if (bit) {
+        delayMicroseconds(one_len);
+        pwm_bl = one_len;
+        digitalWrite(TRX_PIN, LOW);
+        delayMicroseconds(pd_len-pwm_bl);
+      } else {
+        delayMicroseconds(zero_len);
+        pwm_bl = zero_len;
+        digitalWrite(TRX_PIN, LOW);
+        delayMicroseconds(pd_len-pwm_bl);
+      }
+    }
+    // delay between packets
+    delayMicroseconds(pause_len);
+  }
+  return 0;
+}
