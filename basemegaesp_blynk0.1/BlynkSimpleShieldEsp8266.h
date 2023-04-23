@@ -39,21 +39,19 @@ class BlynkTransportShieldEsp8266
         ((BlynkTransportShieldEsp8266*)ptr)->onData(mux_id, len);
     }
 
-    void onData(uint8_t mux_id, int32_t len) {
-      //BLYNK_LOG1(mux_id);
+    void onData(uint8_t mux_id, uint32_t len) {
+        //BLYNK_LOG1(mux_id);
         if (mux_id != BLYNK_ESP8266_MUX) {
-          http_process(client, mux_id, len);
-          return;
+            http_process(client, mux_id, len);
+            return;
         }
-        //BLYNK_LOG4("Got: ", len, ", Free: ", buffer.free());
-        if (buffer.free() < len) {
-          BLYNK_LOG1(BLYNK_F("Buffer overflow"));
-          return;
-        }
+        //BLYNK_LOG2("Got ", len);
         while (len) {
             if (client->getUart()->available()) {
                 uint8_t b = client->getUart()->read();
-                buffer.put(b);
+                 if(!buffer.push(b)) {
+                    BLYNK_LOG1(BLYNK_F("Buffer overflow"));
+                }
                 len--;
             }
         }
@@ -71,8 +69,6 @@ public:
         client = esp8266;
         client->setOnData(onData, this);
     }
-
-    //TODO: IPAddress
 
     void begin(const char* d,  uint16_t p) {
         domain = d;
@@ -93,12 +89,12 @@ public:
     }
 
     size_t read(void* buf, size_t len) {
-        millis_time_t start = BlynkMillis();
-        //BLYNK_LOG4("Waiting: ", len, " Buffer: ", buffer.size());
-        while ((buffer.size() < len) && (BlynkMillis() - start < 1500)) {
+        uint32_t start = millis();
+        //BLYNK_LOG4("Waiting: ", len, " Occuied: ", buffer.getOccupied());
+        while ((buffer.getOccupied() < len) && (millis() - start < 1500)) {
             client->run();
         }
-        return buffer.get((uint8_t*)buf, len);
+        return buffer.read((uint8_t*)buf, len);
     }
     size_t write(const void* buf, size_t len) {
         if (client->send(BLYNK_ESP8266_MUX, (const uint8_t*)buf, len)) {
@@ -111,8 +107,8 @@ public:
 
     int available() {
         client->run();
-        //BLYNK_LOG2("Still: ", buffer.size());
-        return buffer.size();
+        //BLYNK_LOG2("Still: ", buffer.getOccupied());
+        return buffer.getOccupied();
     }
 
 private:
@@ -135,7 +131,7 @@ public:
 
     bool connectWiFi(const char* ssid, const char* pass)
     {
-        BlynkDelay(500);
+        ::delay(500);
         BLYNK_LOG2(BLYNK_F("Connecting to "), ssid);
         /*if (!wifi->restart()) {
             BLYNK_LOG1(BLYNK_F("Failed to restart"));
@@ -143,7 +139,6 @@ public:
         }*/
         if (!wifi->kick()) {
              BLYNK_LOG1(BLYNK_F("ESP is not responding"));
-             //TODO: BLYNK_LOG_TROUBLE(BLYNK_F("esp8266-not-responding"));
              return false;
         }
         if (!wifi->setEcho(0)) {
@@ -166,6 +161,10 @@ public:
             BLYNK_LOG1(BLYNK_F("Failed to connect WiFi"));
             return false;
         }
+        /*if (!wifi->setStationIp("192.168.188.45","192.168.188.1","255.255.255.0",3)) {
+            BLYNK_LOG1(BLYNK_F("Failed to set IP"));
+            return false;
+        }*/
         BLYNK_LOG1(BLYNK_F("Connected to WiFi"));
         return true;
     }
@@ -188,9 +187,43 @@ public:
                const char* domain = BLYNK_DEFAULT_DOMAIN,
                uint16_t    port   = BLYNK_DEFAULT_PORT)
     {
-        config(esp8266, auth, domain, port);
+         /*Serial.println(wifi->getIPStatus());
         connectWiFi(ssid, pass);
-        while(this->connect() != true) {}
+        Serial.println(wifi->getIPStatus());
+        while(this->connect() != true) {
+          Serial.println(wifi->getIPStatus());
+          if (!wifi->getIPStatus().startsWith("STATUS:2")) {
+            connectWiFi(ssid, pass);
+            Serial.println("WIFI");
+          }
+          BLYNK_LOG1(BLYNK_F("..."));
+        }*/
+        config(esp8266, auth, domain, port);
+        Serial.println(wifi->getIPStatus());
+        int mytimeout = millis() / 1000;
+        if (!wifi->getIPStatus().startsWith("STATUS:2")) {
+          while (connectWiFi(ssid, pass) == false) { 
+            if((millis() / 1000) > mytimeout + 8) {  // try for less than 9 seconds
+              break;
+            }
+          }
+          //connectWiFi(ssid, pass);
+        }
+        Serial.println(wifi->getIPStatus());
+        if (wifi->getIPStatus().startsWith("STATUS:2")) {
+          /*if (this->connect()) {
+            BLYNK_LOG1(BLYNK_F("Connected!"));
+          } else {
+            BLYNK_LOG1(BLYNK_F("Connection failed!"));
+          }*/
+          mytimeout = millis() / 1000;
+          while (this->connect() == false) {
+            if((millis() / 1000) > mytimeout + 8) {  // try for less than 9 seconds
+              BLYNK_LOG1(BLYNK_F("Connection failed!"));
+              break;
+            }
+          }
+        }
     }
 
     void reconnect(const char* ssid, const char* pass)
@@ -237,12 +270,8 @@ private:
     ESP8266* wifi;
 };
 
-#if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_BLYNK)
-  static BlynkTransportShieldEsp8266 _blynkTransport;
-  BlynkWifi Blynk(_blynkTransport);
-#else
-  extern BlynkWifi Blynk;
-#endif
+static BlynkTransportShieldEsp8266 _blynkTransport;
+BlynkWifi Blynk(_blynkTransport);
 
 #include <BlynkWidgets.h>
 

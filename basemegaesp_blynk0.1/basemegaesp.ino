@@ -1,10 +1,4 @@
-// Template ID, Device Name and Auth Token are provided by the Blynk.Cloud
-// See the Device Info tab, or Template settings
-#define BLYNK_TEMPLATE_ID "TMPLMOqROJSS"
-#define BLYNK_DEVICE_NAME "ArduinoMegaESP8266"
-// Comment this out to disable prints and save space
 #define BLYNK_PRINT Serial
-
 #include "RF24.h"
 #include <LiquidCrystal_I2C.h>
 #include <EEPROM.h>
@@ -14,6 +8,7 @@
 #include <TimeLib.h>
 #include <WidgetRTC.h>
 #include <RCSwitch.h>
+//#include "Oregon.h"
 #include "secret.h"
 
 bool isFirstConnect = true;
@@ -62,6 +57,12 @@ boolean lowLongPressActive = false;
 long highButtonTimer = 0;
 boolean highButtonActive = false;
 boolean highLongPressActive = false;
+
+//byte mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0x5A, 0x82 };
+/*IPAddress manualIP(192,168,178,50);
+IPAddress gateway(192,168,178,1);
+IPAddress subnet(255, 255, 255, 0);
+EthernetServer server(80);*/
 boolean dhcpConnected = false;
 boolean armed = false;
 boolean alarm = false;
@@ -75,6 +76,7 @@ float tempO;
 char tmpid[2] = "";
 char jsonline[128] ={0};
 tmElements_t tm;
+//uint8_t msg[2048] = "HTTP/1.1 200 OK\n"
 char msg[2048] = "HTTP/1.1 200 OK\n"
 "Server: ESP8266\n"
 "Access-Control-Allow-Origin: *\n"
@@ -87,33 +89,21 @@ char suffixdown[9] = "10010100";
 char code[25] = {0};
 bool firstsync = true;
 
-char auth[] = BLYNK_AUTH_TOKEN;
-
-// Your WiFi credentials.
-// Set password to "" for open networks.
-
-// Hardware Serial on Mega, Leonardo, Micro...
-//#define EspSerial Serial1
 #define EspSerial Serial3
-
-// or Software Serial on Uno, Nano...
-//#include <SoftwareSerial.h>
-//SoftwareSerial EspSerial(2, 3); // RX, TX
-
-// Your ESP8266 baud rate:
-//#define ESP8266_BAUD 38400
 #define ESP8266_BAUD 115200
 
 ESP8266 wifi(&EspSerial);
-
 BlynkTimer timer;
 BlynkTimer ttimer;
 RCSwitch mySwitch = RCSwitch();
 #define TRX_PIN  12
 #define VOLTAGE_THRESH 4.0
+//THN132N sender1(TRX_PIN, 0xAA, 1);
+//THN132N sender2(TRX_PIN, 0x20, 2);
+
 String inputString        = "";         // a string to hold incoming data
 unsigned int modulation   = 0;          // PWM = 0, PPM = 1
-unsigned int repeats      = 8;          // signal repeats
+unsigned int repeats      = 6;          // signal repeats
 unsigned int bits         = 40;         // amount of bits in a packet
 unsigned int channel      = 3;          // remote channel
 unsigned int pd_len       = 1064;  //1088      // pulse/distance length (in us)
@@ -124,17 +114,14 @@ unsigned int one_len_left = pd_len-one_len;        // length of 0 (in us)
 unsigned int pause_len    = 7500;  //7500    // pause length (in us), time between packets
 unsigned int preamble     = 0;       // preamble length (in us)
 unsigned int invert       = 0;          // invert the bits before transmit
+//char packet_buf[256]      = {0};        // packet payload buffer
 char packet_buf[256]      = {0};        // packet payload buffer
 unsigned int pbuf_len     = 0;          // payload buffer length
 unsigned int bit_pos      = 0;          // bit reader bit position
 unsigned int curtain      = 1;
 
-
-void setup()
-{
-  // Debug console
+void setup(void){
   Serial.begin(115200);
-
   Serial.println(F("Setup!"));
   lcd.begin(16,2);   // initialize the lcd for 16 chars 2 lines, turn on backlight
   lcd.noBacklight(); // finish with backlight on
@@ -186,14 +173,9 @@ void setup()
   radio.openReadingPipe(1,saddr[0]);
   radio.startListening();
 
-  // Set ESP8266 baud rate
   EspSerial.begin(ESP8266_BAUD);
-  delay(10);
 
   Blynk.begin(auth, wifi, ssid, pass);
-  // You can also specify server:
-  //Blynk.begin(auth, wifi, ssid, pass, "blynk.cloud", 80);
-  //Blynk.begin(auth, wifi, ssid, pass, IPAddress(192,168,1,100), 8080);
 
   if (Blynk.connected()) {
     Serial.println(F("Rete in setup"));
@@ -213,6 +195,7 @@ void setup()
   } else {
       Serial.print(F("set tcp server timout err\r\n"));
   }
+
 }
 
 void CheckConnection(){
@@ -295,8 +278,7 @@ void loop() {
   if ((alarm) && !alarmSent) {
     Blynk.virtualWrite(V6, 1);
     String text = "Allarme varco ";
-    //Blynk.notify(text+=sid);
-     Blynk.logEvent("alarm", String("Allarme varco: ") + sid);
+    Blynk.notify(text+=sid);
     alarmSent = true;
   }
 
@@ -518,7 +500,7 @@ void printToSerial(char *line, char time[20]) {
   Serial.print(line);
   Serial.print(F(" "));
   Serial.println(time);
-  //Serial.println(freeRam());
+  Serial.println(freeRam());
 }
 
 char *lcdLine(int sid) {
@@ -844,7 +826,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
       } else {
         BLYNK_LOG1(BLYNK_F("release tcp err"));
       }
-      //Serial.println(freeRam());
+      Serial.println(freeRam());
       return;
 }
 
@@ -878,7 +860,7 @@ void printToJSON() {
   strcat(msg,"\",\n\"Temp S\":\"");
   strcat(msg,temp);
   dtostrf(tempO,5, 2, temp);
-  strcat(msg,"\",\n\"Temp E\":\"");
+  strcat(msg,"\",\n\"Temp O\":\"");
   strcat(msg,temp);
   strcat(msg,"\",\n\"Started at\":\"");
   strcat(msg,startedAt);
@@ -898,11 +880,11 @@ int printAllEnabled(int len) {
   return len+(5*SENSOR_NUM*2);
 }
 
-/*int freeRam () {
+int freeRam () {
    extern int __heap_start, *__brkval; 
    int v; 
    return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-}*/
+}
 
 void openShutter(int gate) {
   Serial.println("APRI");
@@ -989,9 +971,6 @@ int get_bit() {
 }
 
 int curtain_command(int command, int channel) {
-  /*Serial.print(F("Curtain: "));
-  Serial.print(channel);Serial.print(F(" "));
-  Serial.println(command);*/
   int i,j;
   int bit;
   int pwm_bl;
@@ -1048,4 +1027,3 @@ int curtain_command(int command, int channel) {
   }
   return 0;
 }
-
