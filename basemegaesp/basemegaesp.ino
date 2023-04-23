@@ -110,22 +110,11 @@ BlynkTimer timer;
 BlynkTimer ttimer;
 RCSwitch mySwitch = RCSwitch();
 #define TRX_PIN  12
-#define VOLTAGE_THRESH 4.0
-String inputString        = "";         // a string to hold incoming data
-unsigned int modulation   = 0;          // PWM = 0, PPM = 1
-unsigned int repeats      = 8;          // signal repeats
-unsigned int bits         = 40;         // amount of bits in a packet
-unsigned int channel      = 3;          // remote channel
-unsigned int pd_len       = 1064;  //1088      // pulse/distance length (in us)
-unsigned int zero_len     = 700;   //716     // length of 0 (in us)
-unsigned int zero_len_left= pd_len-zero_len;        // length of 0 (in us)
-unsigned int one_len      = 345;   //360    // length of 1 (in us)
-unsigned int one_len_left = pd_len-one_len;        // length of 0 (in us)
-unsigned int pause_len    = 7500;  //7500    // pause length (in us), time between packets
-unsigned int preamble     = 0;       // preamble length (in us)
-unsigned int invert       = 0;          // invert the bits before transmit
+//#define VOLTAGE_THRESH 4.0
+//unsigned int channel      = 3;          // remote channel
+
+//unsigned int preamble     = 0;       // preamble length (in us)
 char packet_buf[256]      = {0};        // packet payload buffer
-unsigned int pbuf_len     = 0;          // payload buffer length
 unsigned int bit_pos      = 0;          // bit reader bit position
 unsigned int curtain      = 1;
 
@@ -241,7 +230,7 @@ void SendTemp() {
 
 void sync() {
   //brtc.begin();
-  clockDisplay();
+  //clockDisplay();
   if (year()!=1970) {
     tm.Year = CalendarYrToTm(year());
     tm.Month = month();
@@ -255,7 +244,7 @@ void sync() {
   }
 }
 
-void clockDisplay()
+/*void clockDisplay()
 {
   // You can call hour(), minute(), ... at any time
   // Please see Time library examples for details
@@ -272,7 +261,7 @@ void clockDisplay()
   //Blynk.virtualWrite(V1, currentTime);
   // Send date to the App
   //Blynk.virtualWrite(V2, currentDate);
-}
+}*/
 
 void loop() {
   pushButtonHigh();
@@ -609,7 +598,6 @@ BLYNK_CONNECTED() // runs every time Blynk connection is established
       isFirstConnect = false;
     }
     wlcd.clear();
-    //clockDisplay();
 }
 
 BLYNK_WRITE(V0) {
@@ -655,12 +643,12 @@ BLYNK_WRITE(V4) {
   }
 }
 
-BLYNK_WRITE(V7) {
+/*BLYNK_WRITE(V7) {
   if (param.asInt()) {
     clockDisplay();
     sync();
   }
-}
+}*/
 
 BLYNK_WRITE(V8) {
   if (param.asInt()) {
@@ -690,7 +678,7 @@ BLYNK_WRITE(V19) {
   }
 }
 
-BLYNK_WRITE(V20) {
+/*BLYNK_WRITE(V20) {
   if (param.asInt()) {
     openShutter(param.asInt());
   }
@@ -700,7 +688,7 @@ BLYNK_WRITE(V21) {
   if (param.asInt()) {
     closeShutter(param.asInt());
   }
-}
+}*/
 
 BLYNK_WRITE(V22) {
   if (param.asInt()) {
@@ -725,10 +713,14 @@ BLYNK_WRITE(V23) {
 }
 
 void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
-      BLYNK_LOG1(BLYNK_F("Arriva!"));
-      Serial.print(F("LEN: "));
-      Serial.println(len);
-      //char received[32] = {0};
+      //BLYNK_LOG1(BLYNK_F("Arriva!"));
+      //Serial.print(F("LEN: "));
+      //Serial.println(len);
+      /*char msg[2048] = "HTTP/1.1 200 OK\n"
+"Server: ESP8266\n"
+"Access-Control-Allow-Origin: *\n"
+"Access-Control-Allow-Headers: Content-Type\n"
+"Connection: close\n\0";*/
       int reslen = 125;
       msg[reslen] = '\0';
       char c ;
@@ -774,19 +766,19 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
             reslen+=161;
         } else if (strncmp(received+4,"/allIntEnabled",14) == 0) {
             setAllIntEnabled();
-            strcat(msg,"All internal enabled\n");
+            strcat(msg,"All int enabled\n");
             reslen+=21;
         } else if (strncmp(received+4,"/allIntDisabled",15) == 0) {
             setAllIntDisabled();
-            strcat(msg,"All internal disabled\n");
+            strcat(msg,"All int disabled\n");
             reslen+=22;
         } else if (strncmp(received+4,"/allExtEnabled",14) == 0) {
             setAllExtEnabled();
-            strcat(msg,"All external enabled\n");
+            strcat(msg,"All ext enabled\n");
             reslen+=21;
         } else if (strncmp(received+4,"/allExtDisabled",15) == 0) {
             setAllExtDisabled();
-            strcat(msg,"All external disabled\n");
+            strcat(msg,"All ext disabled\n");
             reslen+=22;
         } else if (strncmp(received+4,"/printEnabled",13) == 0) {
             reslen=printAllEnabled(reslen);
@@ -797,7 +789,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+reslen,"Int.Gate %2d enabled\n",id);
               reslen+=20;
             } else {
-              strcat(msg,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR:Unvalid id\n");
               reslen+=18;
             }
         } else if (strncmp(received+4,"/intDisable?id=",15) == 0) {
@@ -807,7 +799,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+reslen,"Int.Gate %2d disabled\n",id);
               reslen+=21;
             } else {
-              strcat(msg,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR:Unvalid id\n");
               reslen+=18;
             }
         } else if (strncmp(received+4,"/extEnable?id=",14) == 0) {
@@ -817,7 +809,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+reslen,"Ext.Gate %2d enabled\n",id);
               reslen+=20;            
             } else {
-              strcat(msg,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR:Unvalid id\n");
               reslen+=18;
             }
         } else if (strncmp(received+4,"/extDisable?id=",15) == 0) {
@@ -827,7 +819,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
               sprintf(msg+reslen,"Ext.Gate %2d disabled\n",id);
               reslen+=21;
             } else {
-              strcat(msg,"ERROR: Unvalid id\n");
+              strcat(msg,"ERROR:Unvalid id\n");
               reslen+=18;
             }
         } else {
@@ -980,6 +972,7 @@ char get_hex_char(char hchar){
 }
 
 int get_bit() {
+  unsigned int invert       = 0;          // invert the bits before transmit
   int ret;
   int byte_pos     = bit_pos / 8;
   int byte_bit_pos = 7 - (bit_pos % 8);     // reverse indexing to send the bits msb
@@ -992,6 +985,17 @@ int curtain_command(int command, int channel) {
   /*Serial.print(F("Curtain: "));
   Serial.print(channel);Serial.print(F(" "));
   Serial.println(command);*/
+  String inputString = "";
+  //unsigned int modulation   = 0;          // PWM = 0, PPM = 1
+  unsigned int repeats      = 8;          // signal repeats
+  unsigned int bits         = 40;         // amount of bits in a packet
+  unsigned int pd_len       = 1064;  //1088      // pulse/distance length (in us)
+  unsigned int zero_len     = 700;   //716     // length of 0 (in us)
+  unsigned int zero_len_left= pd_len-zero_len;        // length of 0 (in us)
+  unsigned int one_len      = 345;   //360    // length of 1 (in us)
+  unsigned int one_len_left = pd_len-one_len;        // length of 0 (in us)
+  unsigned int pause_len    = 7500;  //7500    // pause length (in us), time between packets
+  unsigned int pbuf_len     = 0;          // payload buffer length
   int i,j;
   int bit;
   int pwm_bl;
