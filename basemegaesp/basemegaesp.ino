@@ -75,7 +75,7 @@ float tempO;
 char tmpid[2] = "";
 char jsonline[128] ={0};
 tmElements_t tm;
-char msg[2048] = "HTTP/1.1 200 OK\n"
+char msg[1853] = "HTTP/1.1 200 OK\n"
 "Server: ESP8266\n"
 "Access-Control-Allow-Origin: *\n"
 "Access-Control-Allow-Headers: Content-Type\n"
@@ -826,7 +826,7 @@ void http_process(ESP8266* client, uint8_t mux_id, uint32_t len) {
           msg[reslen-39]='\0';
           strcat(msg,"Content-Type: application/json\n\n");
           printToJSON();
-          reslen=117*SENSOR_NUM+52+reslen-8+54;
+          reslen=113*SENSOR_NUM+52+reslen-8+54;
         }
       }
       
@@ -846,7 +846,7 @@ void printLineToJSON(int sid) {
   char vcc[5];
   dtostrf(sensorData[sid].temp,5, 2, temp);
   dtostrf(sensorData[sid].vcc,4, 2, vcc);
-  snprintf(jsonline,128,"\t{\"Id\":\"%02d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Battery V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
+  snprintf(jsonline,128,"\t{\"Id\":\"%02d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Bat V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
   if (sid == SENSOR_NUM-1 ) {
     strcat(jsonline,"\"}\n");
   } else {
