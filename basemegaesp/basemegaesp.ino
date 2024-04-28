@@ -1,6 +1,7 @@
 // Template ID, Device Name and Auth Token are provided by the Blynk.Cloud
 // See the Device Info tab, or Template settings
 #define BLYNK_TEMPLATE_ID "TMPLMOqROJSS"
+#define BLYNK_TEMPLATE_NAME "ArduinoMegaESP8266"
 #define BLYNK_DEVICE_NAME "ArduinoMegaESP8266"
 // Comment this out to disable prints and save space
 #define BLYNK_PRINT Serial
@@ -37,8 +38,9 @@ sensorDataRecord tempData;
 int sid;
 int sidOnDisplay = SENSOR_NUM - 1;
 
-LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+//LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
 //LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address
+LiquidCrystal_I2C lcd(0x3F, 16,2);
 
 const int rftxdatapin = 12;
 const int highButtonPin = A3;
@@ -702,12 +704,22 @@ BLYNK_WRITE(V24) {
 }
 BLYNK_WRITE(V23) {
   if (param.asInt()) {
-    if (param.asInt()==1) {
-      curtain_command(1, curtain);
-    } else if (param.asInt()==2) {
-      curtain_command(0, curtain);
+    if (curtain==1 || curtain>4) {
+      if (param.asInt()==1) {
+        old_curtain_command(1, curtain);
+      } else if (param.asInt()==2) {
+        old_curtain_command(0, curtain);
+      } else {
+        old_curtain_command(-1, curtain);
+      }
     } else {
-      curtain_command(-1, curtain);
+      if (param.asInt()==1) {
+        curtain_command(1, curtain);
+      } else if (param.asInt()==2) {
+        curtain_command(0, curtain);
+      } else {
+        curtain_command(-1, curtain);
+      }
     }
   }
 }
@@ -981,10 +993,10 @@ int get_bit() {
   return ret^invert;
 }
 
-int curtain_command(int command, int channel) {
-  /*Serial.print(F("Curtain: "));
+int old_curtain_command(int command, int channel) {
+  Serial.print(F("Curtain: "));
   Serial.print(channel);Serial.print(F(" "));
-  Serial.println(command);*/
+  Serial.println(command);
   String inputString = "";
   //unsigned int modulation   = 0;          // PWM = 0, PPM = 1
   unsigned int repeats      = 8;          // signal repeats
@@ -1053,3 +1065,106 @@ int curtain_command(int command, int channel) {
   return 0;
 }
 
+int curtain_command(int comm, int channel) {
+  Serial.print(F("Curtain: "));
+  Serial.print(channel);Serial.print(F(" "));
+  Serial.println(comm);
+  String inputString        = "";         // a string to hold incoming data
+  unsigned int modulation   = 0;          // PWM = 0, PPM = 1
+  unsigned int repeats      = 2;          // signal repeats
+  unsigned int bits         = 25;         // amount of bits in a packet
+  unsigned int pd_len       = 1296;        // pulse/distance length (in us)
+  unsigned int zero_len     = 986;        // length of 0 (in us)
+  unsigned int zero_len_left= pd_len-zero_len;        // length of 0 (in us)
+  unsigned int one_len      = 320;       // length of 1 (in us)
+  unsigned int one_len_left = pd_len-one_len;        // length of 0 (in us)
+  unsigned int pause_len    = 7450;      // pause length (in us), time between packets
+  unsigned int pbuf_len     = 0;          // payload buffer length
+  int i,j, jj;
+  int bit;
+  int pwm_bl;
+
+  // send preamble - not implemented
+  if (comm>=1) { //up
+    inputString = "d0f7fb80";
+  } else if (comm<=-1) { //down
+    inputString = "d0f7fd80";
+  } else {
+    inputString = "d0f7f780";
+  }
+  inputString[1]=get_hex_char(5-channel);
+  for (int i=0 ; i<inputString.length()-1 ; i++){
+    packet_buf[i]  = hextoInt((char)inputString[(i*2)]) << 4;
+    packet_buf[i] |= hextoInt((char)inputString[(i*2) + 1]);
+  }
+  // TODO clear the packet_buf buffer 
+  pbuf_len = ((inputString.length()-1)+1)/2;  //round up
+  for (j=0; j<(repeats); j++) {
+    // reset bit reader
+    bit_pos = 0;
+    //At the middle complements last nibble
+    if (j==repeats) {
+      //Serial.println(15-hextoInt((char)inputString[9]));
+      packet_buf[4] &= 240;
+      packet_buf[4] |= (15-hextoInt((char)inputString[9]));
+    }
+    // send bits
+    for (i=0; i<bits; i++) {
+      bit = get_bit();
+      digitalWrite(TRX_PIN, HIGH);
+      if (bit) {
+        delayMicroseconds(one_len);
+        pwm_bl = one_len;
+        digitalWrite(TRX_PIN, LOW);
+        delayMicroseconds(pd_len-pwm_bl);
+      } else {
+        delayMicroseconds(zero_len);
+        pwm_bl = zero_len;
+        digitalWrite(TRX_PIN, LOW);
+        delayMicroseconds(pd_len-pwm_bl);
+      }
+    }
+    // delay between packets
+    delayMicroseconds(pause_len);
+  }
+
+  delay(200);
+
+  inputString[1]=get_hex_char(5-channel);
+  for (int i=0 ; i<inputString.length()-1 ; i++){
+    packet_buf[i]  = hextoInt((char)inputString[(i*2)]) << 4;
+    packet_buf[i] |= hextoInt((char)inputString[(i*2) + 1]);
+  }
+  // TODO clear the packet_buf buffer 
+  pbuf_len = ((inputString.length()-1)+1)/2;  //round up
+  for (j=0; j<(repeats); j++) {
+    // reset bit reader
+    bit_pos = 0;
+    //At the middle complements last nibble
+    if (j==repeats) {
+      //Serial.println(15-hextoInt((char)inputString[9]));
+      packet_buf[4] &= 240;
+      packet_buf[4] |= (15-hextoInt((char)inputString[9]));
+    }
+    // send bits
+    for (i=0; i<bits; i++) {
+      bit = get_bit();
+      digitalWrite(TRX_PIN, HIGH);
+      if (bit) {
+        delayMicroseconds(one_len);
+        pwm_bl = one_len;
+        digitalWrite(TRX_PIN, LOW);
+        delayMicroseconds(pd_len-pwm_bl);
+      } else {
+        delayMicroseconds(zero_len);
+        pwm_bl = zero_len;
+        digitalWrite(TRX_PIN, LOW);
+        delayMicroseconds(pd_len-pwm_bl);
+      }
+    }
+    // delay between packets
+    delayMicroseconds(pause_len);
+  }
+
+  return 0;
+}
