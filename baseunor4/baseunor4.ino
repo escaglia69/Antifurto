@@ -1,5 +1,5 @@
-#define BLYNK_TEMPLATE_ID           "TMPL4UVdvUKWC"
-#define BLYNK_TEMPLATE_NAME         "ArduinoR4"
+#define BLYNK_TEMPLATE_ID "TMPL4B5_GeqGz"
+#define BLYNK_TEMPLATE_NAME "ArduinoR4"
 #define TRX_PIN  12
 
 /* Comment this out to disable prints and save space */
@@ -865,6 +865,128 @@ BLYNK_CONNECTED()
     wlcd.clear();
 }
 
+
+BLYNK_WRITE(V0) {
+  if (param.asInt()) {
+    //HIGH
+    arm();
+  } else {
+    //LOW
+    unarm();
+  }
+}
+
+BLYNK_WRITE(V6) {
+  if (param.asInt()) {
+    Blynk.virtualWrite(V6, 0);
+    Serial.println("V6");
+  } else {
+    resetAlarm();
+  }
+}
+
+BLYNK_WRITE(V3) {
+  if (param.asInt()) {
+        sidOnDisplay+=1;
+        if (sidOnDisplay >= SENSOR_NUM) {
+          sidOnDisplay -= SENSOR_NUM;
+        }
+        lcdLine(sidOnDisplay);
+        printOnLCD(lcdl);
+        printOnWLCD(lcdl);
+  }
+}
+
+BLYNK_WRITE(V4) {
+  if (param.asInt()) {
+        sidOnDisplay-=1;
+        if (sidOnDisplay <0) {
+          sidOnDisplay += SENSOR_NUM;
+        }
+        lcdLine(sidOnDisplay);
+        printOnLCD(lcdl);
+        printOnWLCD(lcdl);
+  }
+}
+
+/*BLYNK_WRITE(V7) {
+  if (param.asInt()) {
+    clockDisplay();
+    sync();
+  }
+}*/
+
+BLYNK_WRITE(V8) {
+  if (param.asInt()) {
+    enableIntId(sidOnDisplay);
+  } else {
+    disableIntId(sidOnDisplay);
+  }
+}
+
+BLYNK_WRITE(V9) {
+  if (param.asInt()) {
+    lcd.backlight();
+  } else {
+    lcd.noBacklight();
+  }
+}
+
+BLYNK_WRITE(V18) {
+  if (param.asInt()) {
+    openShutter(sidOnDisplay);
+  }
+}
+
+BLYNK_WRITE(V19) {
+  if (param.asInt()) {
+    closeShutter(sidOnDisplay);
+  }
+}
+
+/*BLYNK_WRITE(V20) {
+  if (param.asInt()) {
+    openShutter(param.asInt());
+  }
+}
+
+BLYNK_WRITE(V21) {
+  if (param.asInt()) {
+    closeShutter(param.asInt());
+  }
+}*/
+
+BLYNK_WRITE(V22) {
+  if (param.asInt()) {
+    curtain=param.asInt();
+  }
+}
+BLYNK_WRITE(V24) {
+  if (param.asInt()) {
+    curtain=10+param.asInt();
+  }
+}
+BLYNK_WRITE(V23) {
+  if (param.asInt()) {
+    if (curtain==1 || curtain>4) {
+      if (param.asInt()==1) {
+        old_curtain_command(1, curtain);
+      } else if (param.asInt()==2) {
+        old_curtain_command(0, curtain);
+      } else {
+        old_curtain_command(-1, curtain);
+      }
+    } else {
+      if (param.asInt()==1) {
+        curtain_command(1, curtain);
+      } else if (param.asInt()==2) {
+        curtain_command(0, curtain);
+      } else {
+        curtain_command(-1, curtain);
+      }
+    }
+  }
+}
 
 // send an NTP request to the time server at the given address
 unsigned long sendNTPpacket(IPAddress& address) {
