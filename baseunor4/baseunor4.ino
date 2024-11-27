@@ -8,7 +8,7 @@
 
 #include <SPI.h>
 #include <WiFiS3.h>
-#include <BlynkSimpleWiFiShieldUnoR4.h>
+#include "BlynkSimpleWiFiShieldUnoR4.h"
 #include "RTC.h"
 #include <WiFiUdp.h>
 #include "secret.h"
@@ -102,8 +102,6 @@ String inputString        = "";
 char packet_buf[256]      = {0};        // packet payload buffer
 unsigned int bit_pos      = 0;          // bit reader bit position
 unsigned int curtain      = 1;
-
-void(* resetFunc) (void) = 0;//declare reset function at address 0
 
 BlynkTimer timer;
 BlynkTimer ttimer;
@@ -256,6 +254,8 @@ void CheckConnection(){
   if(!Connected2Blynk){
     Serial.println(F("Not connected"));
     //Blynk.reconnect(ssid, pass);
+    Blynk.connectWiFi(ssid,pass);
+    Blynk.connect();
   }
 }
 
@@ -445,7 +445,7 @@ void loop()
           sync();
         }
         else if (currentLine.endsWith("GET /reset")) {
-          resetFunc();
+          NVIC_SystemReset();
         }
         else if (currentLine.endsWith("GET /allIntEnabled")) {
           setAllIntEnabled();
