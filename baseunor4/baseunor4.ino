@@ -91,8 +91,9 @@ bool Connected2Blynk = false;
 char startedAt[20] = "01/01/2016 00:00:00";
 float tempN;
 float tempS;
-float tempO;
+float tempE;
 char tmpid[2] = "";
+char jsonline[128] ={0};
 char prefix[9] = "01000101";
 char suffixup[9] = "10010001";
 char suffixdown[9] = "10010100";
@@ -172,9 +173,9 @@ void setup()
   // Retrieve the date and time from the RTC and print them
   RTC.getTime(currentTime); 
   Serial.println("The RTC was just set to: " + String(currentTime));
-  String(currentTime).toCharArray(startedAt,20);
+  //String(currentTime).toCharArray(startedAt,20);
+  sprintf(startedAt, "%02d/%02d/%04d %02d:%02d:%02d", currentTime.getDayOfMonth(), currentTime.getMonth(), currentTime.getYear(), currentTime.getHour(), currentTime.getMinutes(), currentTime.getSeconds());
   
-
   Serial.println(F("Setup!"));
   lcd.init();
   lcd.noBacklight(); // finish with backlight on
@@ -335,11 +336,11 @@ void loop()
         tempLine(tempData.sid,'S');
       }
       if(tempData.sid==90) {
-        //tempO=tempData.temp;
-        memcpy(&tempO, &tempData.temp, 4);
-        //sender1.send(tempO,tempData.vcc > VOLTAGE_THRESH);
+        //tempE=tempData.temp;
+        memcpy(&tempE, &tempData.temp, 4);
+        //sender1.send(tempE,tempData.vcc > VOLTAGE_THRESH);
         Serial.print(F("TEMP EST: "));
-        Serial.println(tempO);
+        Serial.println(tempE);
         tempLine(tempData.sid,'E');
       }
       printToSerial(lcdl,tempData.dateTime);
@@ -354,8 +355,10 @@ void loop()
   
   WiFiClient client = server.available();
   if (client) {
+    bool hom = false;
     bool printAllEnabled = false;
-    bool help=false;
+    bool help = false;
+    bool json = false;
     Serial.println("new client");
     String currentLine = "";                // make a String to hold incoming data from the client
     while (client.connected()) {            // loop while the client's connected
@@ -368,33 +371,45 @@ void loop()
           // if the current line is blank, you got two newline characters in a row.
           // that's the end of the client HTTP request, so send a response:
           if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println();
-
-            // the content of the HTTP response follows the header:
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/help\">Help</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/arm\">Arm</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/unarm\">Unarm</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/alarmReset\">Alarm reset</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/sync\">Sync</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/reset\">Restart</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/allIntEnabled\">All internal enabled</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/allIntDisabled\">All internal disabled</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/allExtEnabled\">All external enabled</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/allExtDisabled\">All external disabled</a><br></p>");
-            client.print("<p style=\"font-size:3vw;\"><a href=\"/printEnabled\">Print enabled</a><br></p>");
-            client.print("<form action=intEnable>\n\t<label>Enable Int Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
-            client.print("<form action=intDisable>\n\t<label>Disable Int Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
-            client.print("<form action=extEnable>\n\t<label>Enable Ext Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
-            client.print("<form action=extDisable>\n\t<label>Disable Int Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
-            client.print("<form>\n\t<label>Awning Id: </label>\n\t<input type=text name=id required>\n\t<button formaction=awningUp>UP</button>\n\t<button formaction=awningStop>STOP</button>\n\t<button formaction=awningDown>DOWN</button>\n</form>");
-            client.print("<form>\n\t<label>Shutter Id: </label>\n\t<input type=text name=id required>\n\t<button formaction=shutterOpen>OPEN</button>\n\t<button formaction=shutterClose>CLOSE</button>\n</form>");
-            //client.print("\t<input type=submit value=Submit>\n</form>");
-            client.print("<br>");
+            if (hom) {
+              hom = false;
+              // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+              // and a content-type so the client knows what's coming, then a blank line:
+              client.println("HTTP/1.1 200 OK");
+              client.println("Content-Type: text/html");
+              client.println();
+              // the content of the HTTP response follows the header:
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/help\">Help</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/arm\">Arm</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/unarm\">Unarm</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/alarmReset\">Alarm reset</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/sync\">Sync</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/reset\">Restart</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/allIntEnabled\">All internal enabled</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/allIntDisabled\">All internal disabled</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/allExtEnabled\">All external enabled</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/allExtDisabled\">All external disabled</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/printEnabled\">Print enabled</a><br></p>");
+              client.print("<p style=\"font-size:3vw;\"><a href=\"/json\">JSON</a><br></p>");
+              client.print("<form action=intEnable>\n\t<label>Enable Int Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
+              client.print("<form action=intDisable>\n\t<label>Disable Int Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
+              client.print("<form action=extEnable>\n\t<label>Enable Ext Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
+              client.print("<form action=extDisable>\n\t<label>Disable Int Id: </label>\n\t<input type=text name=id required>\n\t<input type=submit value=Submit>\n</form>");
+              client.print("<form>\n\t<label>Awning Id: </label>\n\t<input type=text name=id required>\n\t<button formaction=awningUp>UP</button>\n\t<button formaction=awningStop>STOP</button>\n\t<button formaction=awningDown>DOWN</button>\n</form>");
+              client.print("<form>\n\t<label>Shutter Id: </label>\n\t<input type=text name=id required>\n\t<button formaction=shutterOpen>OPEN</button>\n\t<button formaction=shutterClose>CLOSE</button>\n</form>");
+              //client.print("\t<input type=submit value=Submit>\n</form>");
+              client.print("<br>");
+              client.print("<script>\n\tfunction getId(){\n\tvar id = document.getElementById('awid').value;\n\t}\n\t</script>");
+              // The HTTP response ends with another blank line:
+              client.println();
+            }
             if (printAllEnabled) {
+              printAllEnabled = false;
+              // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+              // and a content-type so the client knows what's coming, then a blank line:
+              client.println("HTTP/1.1 200 OK");
+              client.println("Content-Type: text/html");
+              client.println();
               char line[13] = {0};
               client.print("<p style=\"font-size:3vw;\"><a>Internal</a><br></p>");
               for (int id=0; id<SENSOR_NUM*2; id+=2) {
@@ -409,14 +424,42 @@ void loop()
                 client.print("<br>");
               }
             } else if (help) {
+              help = false;
+              // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+              // and a content-type so the client knows what's coming, then a blank line:
+              client.println("HTTP/1.1 200 OK");
+              client.println("Content-Type: text/html");
+              client.println();
               client.print("<p style=\"font-size:3vw;\">arm<br>unarm<br>alarmreset<br>allIntEnabled<br>allIntDisabled<br>");
               client.print("allExtEnabled<br>allExtDisabled<br>printEnabled<br>intEnable?id=<br>");
               client.print("intDisable?id=<br>extEnable?id=<br>extDisable?id=<br>sync<br>reset<br></p>");
+            } else if (json) {
+              json = false;
+              // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+              // and a content-type so the client knows what's coming, then a blank line:
+              client.println("HTTP/1.1 200 OK");
+              client.println("Content-Type: application/json");
+              client.println();
+              client.print("{\"Sensor\": [\n");
+              for (int id=0; id<SENSOR_NUM; id++) {
+                printLineToJSON(id);
+                client.print(jsonline);
+              }
+              char temp[6];
+              dtostrf(tempN,5, 2, temp);
+              client.print("],\n\"Temp N\":\"");
+              client.print(temp);
+              dtostrf(tempS,5, 2, temp);
+              client.print("\",\n\"Temp S\":\"");
+              client.print(temp);
+              dtostrf(tempE,5, 2, temp);
+              client.print("\",\n\"Temp E\":\"");
+              client.print(temp);
+              client.print("\",\n\"Started at\":\"");
+              client.print(startedAt);
+              client.print("\"\n}\n");
             }
 
-            client.print("<script>\n\tfunction getId(){\n\tvar id = document.getElementById('awid').value;\n\t}\n\t</script>");
-            // The HTTP response ends with another blank line:
-            client.println();
             // break out of the while loop:
             break;
           }
@@ -429,7 +472,11 @@ void loop()
         }
 
         // Check to see what is the client request":
+        if (currentLine.endsWith("GET /")) {
+          hom=true;
+        }
         if (currentLine.endsWith("GET /help")) {
+          hom=false;
           help=true;
         }
         else if (currentLine.endsWith("GET /arm")) {
@@ -460,7 +507,12 @@ void loop()
           setAllExtDisabled();
         }
         else if (currentLine.endsWith("GET /printEnabled")) {
+          hom=false;
           printAllEnabled=true;
+        }
+        else if (currentLine.endsWith("GET /json")) {
+          hom=false;
+          json=true;
         }
         else if (currentLine.indexOf("GET /intEnable?id=") >= 0) {
           int id = getId(client, currentLine);
@@ -758,8 +810,8 @@ void copySensorData(int sid) {
   }
   
   char buffer [20] = "";
-  //sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", tm.Day, tm.Month, tmYearToCalendar(tm.Year), tm.Hour, tm.Minute, tm.Second);
-  String(currentTime).toCharArray(buffer,20);
+  sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", currentTime.getDayOfMonth(), currentTime.getMonth(), currentTime.getYear(), currentTime.getHour(), currentTime.getMinutes(), currentTime.getSeconds());
+  //String(currentTime).toCharArray(buffer,20);
   strcpy(sensorData[sid].dateTime,buffer);
   //delay(5);
 }
@@ -858,7 +910,7 @@ BLYNK_CONNECTED()
       // Request server to re-send latest values for all pins
       //Blynk.syncAll();
       //Blynk.SyncVirtual(V0, V1,...);
-      Blynk.syncVirtual(V22);
+      Blynk.syncVirtual(V5,V22);
       //brtc.begin();
       isFirstConnect = false;
     }
@@ -1009,6 +1061,20 @@ unsigned long sendNTPpacket(IPAddress& address) {
   Udp.beginPacket(address, 123); //NTP requests are to port 123
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
+}
+
+void printLineToJSON(int sid) {
+  jsonline[0] = '\0';
+  char temp[6];
+  char vcc[5];
+  dtostrf(sensorData[sid].temp,5, 2, temp);
+  dtostrf(sensorData[sid].vcc,4, 2, vcc);
+  snprintf(jsonline,128,"\t{\"Id\":\"%02d\", \"Temp\":\"%s\", \"Int door\":\"%d\", \"Ext door\":\"%d\", \"Bat V\":\"%s\", \"Read time\":\"%s",sensorData[sid].sid,temp,sensorData[sid].intDoor,sensorData[sid].extDoor,vcc,sensorData[sid].dateTime);
+  if (sid == SENSOR_NUM-1 ) {
+    strcat(jsonline,"\"}\n");
+  } else {
+    strcat(jsonline,"\"},\n");
+  }
 }
 
 void openShutter(int gate) {
