@@ -164,7 +164,7 @@ void setup()
   // Get the current date and time from an NTP server and convert
   // it to UTC +2 by passing the time zone offset in hours.
   // You may change the time zone offset to your local one.
-  auto unixTime = getUnixTime(2);
+  auto unixTime = getUnixTime(1);
   Serial.print("Unix time = ");
   Serial.println(unixTime);
   RTCTime timeToSet = RTCTime(unixTime);
@@ -174,7 +174,7 @@ void setup()
   RTC.getTime(currentTime); 
   Serial.println("The RTC was just set to: " + String(currentTime));
   //String(currentTime).toCharArray(startedAt,20);
-  sprintf(startedAt, "%02d/%02d/%04d %02d:%02d:%02d", currentTime.getDayOfMonth(), currentTime.getMonth(), currentTime.getYear(), currentTime.getHour(), currentTime.getMinutes(), currentTime.getSeconds());
+  sprintf(startedAt, "%02d/%02d/%04d %02d:%02d:%02d", currentTime.getDayOfMonth(), Month2int(currentTime.getMonth()), currentTime.getYear(), currentTime.getHour(), currentTime.getMinutes(), currentTime.getSeconds());
   
   Serial.println(F("Setup!"));
   lcd.init();
@@ -810,7 +810,7 @@ void copySensorData(int sid) {
   }
   
   char buffer [20] = "";
-  sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", currentTime.getDayOfMonth(), currentTime.getMonth(), currentTime.getYear(), currentTime.getHour(), currentTime.getMinutes(), currentTime.getSeconds());
+  sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", currentTime.getDayOfMonth(), Month2int(currentTime.getMonth()), currentTime.getYear(), currentTime.getHour(), currentTime.getMinutes(), currentTime.getSeconds());
   //String(currentTime).toCharArray(buffer,20);
   strcpy(sensorData[sid].dateTime,buffer);
   //delay(5);
